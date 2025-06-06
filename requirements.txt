@@ -1,14 +1,14 @@
-openai
-pydantic
-python-dotenv
-rich
-prompt_toolkit
-tiktoken
-tree_sitter
+openai>=1.58.1
+pydantic>=2.10.4
+python-dotenv>=1.0.1
+rich>=13.9.4
+prompt-toolkit>=3.0.50
+tiktoken>=0.7.0
+tree_sitter>=0.20.4
 
-pyyaml
+pyyaml>=6.0
 
-aiohttp
-beautifulsoup4
-typer
-questionary
+aiohttp>=3.9.5
+beautifulsoup4>=4.12.3
+typer>=0.12.3
+questionary>=2.0.1

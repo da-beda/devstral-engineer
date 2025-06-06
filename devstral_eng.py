@@ -1406,7 +1406,15 @@ def normalize_path(path_str: str) -> str:
         )
 
     # Now resolve against cwd (and return an absolute path)
-    return str(path.resolve())
+    resolved = path.resolve()
+    base_dir = Path.cwd().resolve()
+    try:
+        resolved.relative_to(base_dir)
+    except ValueError:
+        raise ValueError(
+            f"Invalid path: {resolved!r} escapes the workspace root {base_dir!r}"
+        )
+    return str(resolved)
 
 
 def undo_last_change(num_undos: int = 1):

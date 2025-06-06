@@ -1,5 +1,6 @@
 import typer
 from config import Config, CONFIG_FILE
+from ddg_search import clear_ddg_cache
 from .chat import chat
 
 app = typer.Typer(help="Devstral Engineer CLI")
@@ -38,3 +39,10 @@ def set_default_model(model: str) -> None:
     cfg.default_model = model
     cfg.save()
     typer.echo(f"Default model set to {model}")
+
+
+@app.command("clear-cache")
+def clear_cache() -> None:
+    """Remove cached DuckDuckGo search results."""
+    clear_ddg_cache()
+    typer.echo("DuckDuckGo cache cleared.")

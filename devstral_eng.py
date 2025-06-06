@@ -41,6 +41,10 @@ except Exception:
 
 VERBOSE = False
 DEBUG = False
+PROFILE_DATA = {
+    "_manage_context_window": {"calls": 0, "total": 0.0},
+    "trim_conversation_history": {"calls": 0, "total": 0.0},
+}
 MODE = "ask"
 
 # Initialize Rich console and prompt session
@@ -1277,24 +1281,34 @@ def undo_last_change(num_undos: int = 1):
 conversation_history = [{"role": "system", "content": system_PROMPT}]
 
 
-def _manage_context_window(token_limit: int = 64000, reserve_tokens: int = 1000) -> None:
+def _manage_context_window(
+    token_limit: int = 64000, reserve_tokens: int = 1000
+) -> None:
     """Trim conversation history based on token count similar to Gemini Code."""
-    if not tiktoken:
-        trim_conversation_history()
-        return
+    start = time.perf_counter() if DEBUG else None
+    try:
+        if not tiktoken:
+            trim_conversation_history()
+            return
 
-    encoder = tiktoken.get_encoding("cl100k_base")
+        encoder = tiktoken.get_encoding("cl100k_base")
 
-    def token_count(msgs: List[Dict[str, Any]]) -> int:
-        return sum(len(encoder.encode(m.get("content") or "")) for m in msgs)
+        def token_count(msgs: List[Dict[str, Any]]) -> int:
+            return sum(len(encoder.encode(m.get("content") or "")) for m in msgs)
 
-    while token_count(conversation_history) > token_limit - reserve_tokens:
-        for i, m in enumerate(conversation_history):
-            if m.get("role") != "system":
-                conversation_history.pop(i)
+        while token_count(conversation_history) > token_limit - reserve_tokens:
+            for i, m in enumerate(conversation_history):
+                if m.get("role") != "system":
+                    conversation_history.pop(i)
+                    break
+            else:
                 break
-        else:
-            break
+    finally:
+        if DEBUG and start is not None:
+            PROFILE_DATA["_manage_context_window"]["calls"] += 1
+            PROFILE_DATA["_manage_context_window"]["total"] += (
+                time.perf_counter() - start
+            )
 
 
 def add_to_history(message: Dict[str, Any]) -> None:
@@ -1317,8 +1331,28 @@ def print_help() -> None:
 def parse_args():
     parser = argparse.ArgumentParser(description="Devstral Engineer")
     parser.add_argument("-v", "--verbose", action="store_true", help="verbose output")
-    parser.add_argument("--debug", action="store_true", help="debug output")
+    parser.add_argument(
+        "--debug", action="store_true", help="debug output with profiling"
+    )
     return parser.parse_args()
+
+
+def print_profiling_stats() -> None:
+    """Display simple profiling statistics."""
+    if not DEBUG:
+        return
+
+    table = Table(
+        title="Profiling Stats", show_header=True, header_style="bold magenta"
+    )
+    table.add_column("Function")
+    table.add_column("Calls", justify="right")
+    table.add_column("Total Time (s)", justify="right")
+
+    for name, data in PROFILE_DATA.items():
+        table.add_row(name, str(data["calls"]), f"{data['total']:.6f}")
+
+    console.print(table)
 
 
 # --------------------------------------------------------------------------------
@@ -1526,30 +1560,38 @@ def execute_function_call(tool_call) -> str:
 
 def trim_conversation_history():
     """Trim conversation history based on token count."""
-    if not tiktoken:
-        # Fallback to simple length based trimming
-        if len(conversation_history) <= 20:
+    start = time.perf_counter() if DEBUG else None
+    try:
+        if not tiktoken:
+            # Fallback to simple length based trimming
+            if len(conversation_history) <= 20:
+                return
+            system_msgs = [m for m in conversation_history if m["role"] == "system"]
+            other_msgs = [m for m in conversation_history if m["role"] != "system"]
+            if len(other_msgs) > 15:
+                other_msgs = other_msgs[-15:]
+            conversation_history.clear()
+            conversation_history.extend(system_msgs + other_msgs)
             return
-        system_msgs = [m for m in conversation_history if m["role"] == "system"]
-        other_msgs = [m for m in conversation_history if m["role"] != "system"]
-        if len(other_msgs) > 15:
-            other_msgs = other_msgs[-15:]
-        conversation_history.clear()
-        conversation_history.extend(system_msgs + other_msgs)
-        return
 
-    TOKEN_LIMIT = 64000
-    encoder = tiktoken.get_encoding("cl100k_base")
+        TOKEN_LIMIT = 64000
+        encoder = tiktoken.get_encoding("cl100k_base")
 
-    def messages_token_count(msgs: List[Dict[str, Any]]) -> int:
-        return sum(len(encoder.encode(m.get("content") or "")) for m in msgs)
+        def messages_token_count(msgs: List[Dict[str, Any]]) -> int:
+            return sum(len(encoder.encode(m.get("content") or "")) for m in msgs)
 
-    while messages_token_count(conversation_history) > TOKEN_LIMIT * 0.9:
-        # remove earliest non-system message
-        for i, m in enumerate(conversation_history):
-            if m["role"] != "system":
-                conversation_history.pop(i)
-                break
+        while messages_token_count(conversation_history) > TOKEN_LIMIT * 0.9:
+            # remove earliest non-system message
+            for i, m in enumerate(conversation_history):
+                if m["role"] != "system":
+                    conversation_history.pop(i)
+                    break
+    finally:
+        if DEBUG and start is not None:
+            PROFILE_DATA["trim_conversation_history"]["calls"] += 1
+            PROFILE_DATA["trim_conversation_history"]["total"] += (
+                time.perf_counter() - start
+            )
 
 
 def stream_openai_response(user_message: str):
@@ -1872,6 +1914,7 @@ def main():
     console.print(
         "[bold blue]✨ Session finished. Thank you for using Devstral Engineer![/bold blue]"
     )
+    print_profiling_stats()
 
 
 if __name__ == "__main__":

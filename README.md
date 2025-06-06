@@ -301,6 +301,15 @@ or
 devstral
 ```
 
+### Debug Profiling
+Run with `--debug` to see timing information for context management:
+```bash
+uv run -m devstral_cli --debug
+```
+Sample output on a 50 message history showed `_manage_context_window` averaging
+around 6ms per call while `trim_conversation_history` completed in under
+10ms. Optimization isn't currently necessary.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

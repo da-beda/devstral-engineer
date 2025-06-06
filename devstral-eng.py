@@ -18,6 +18,22 @@ from rich.style import Style
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style as PromptStyle
 import time
+import argparse
+import difflib
+
+try:
+    import tiktoken
+except Exception:
+    tiktoken = None
+
+try:
+    from tree_sitter import Language, Parser
+except Exception:
+    Parser = None
+
+VERBOSE = False
+DEBUG = False
+MODE = "ask"
 
 # Initialize Rich console and prompt session
 console = Console()
@@ -275,6 +291,77 @@ tools = [
                 "required": ["file_path"]
             }
         }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_status",
+            "description": "View git status",
+            "parameters": {"type": "object", "properties": {}, "required": []}
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_diff",
+            "description": "View git diff",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string", "description": "Optional path"}},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_log",
+            "description": "View git commit history",
+            "parameters": {
+                "type": "object",
+                "properties": {"n": {"type": "integer", "description": "Number of commits", "default": 5}},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "git_add",
+            "description": "Stage a file with git add",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string", "description": "File to stage"}},
+                "required": ["path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_build",
+            "description": "Run a build command like make or npm run build",
+            "parameters": {
+                "type": "object",
+                "properties": {"command": {"type": "string", "description": "Build command"}},
+                "required": ["command"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "manage_dependency",
+            "description": "Install or remove a dependency via pip",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string", "description": "install or uninstall"},
+                    "package": {"type": "string", "description": "Package name"}
+                },
+                "required": ["action", "package"]
+            }
+        }
     }
 ]
 
@@ -305,6 +392,9 @@ system_PROMPT = dedent("""\
        - tree_view: Display directory tree
        - run_tests: Run project tests
        - summarize_code: Summarize large files
+       - git_status/git_diff/git_log/git_add: Interact with git
+       - run_build: Trigger build systems
+       - manage_dependency: Install or uninstall packages
 
     Guidelines:
     1. Provide natural, conversational responses explaining your reasoning
@@ -374,7 +464,11 @@ def list_directory(path: str = ".") -> str:
     try:
         result = subprocess.run(["ls", "-lA", path], capture_output=True, text=True)
         if result.returncode == 0:
-            return result.stdout
+            out = result.stdout
+            lines = out.splitlines()
+            if len(lines) > 100:
+                out = "\n".join(lines[:100]) + f"\n... ({len(lines)-100} more lines)"
+            return out
         return f"Error listing directory: {result.stderr.strip()}"
     except Exception as e:
         return f"Error listing directory: {e}"
@@ -408,7 +502,10 @@ def tree_view(path: str = ".", depth: int = 2) -> str:
         result.append(f"{indent}{Path(root).name}/")
         for f in files:
             result.append(f"{indent}  {f}")
-    return "\n".join(result)
+    lines = result
+    if len(lines) > 200:
+        return "\n".join(lines[:200]) + f"\n... ({len(lines)-200} more lines)"
+    return "\n".join(lines)
 
 def _run_quality_command(cmd: list[str], name: str) -> str:
     try:
@@ -438,12 +535,20 @@ def formatter(path: str = ".", formatter_command: str = "black") -> str:
     return _run_quality_command(cmd, "formatter")
 
 def summarize_code(file_path: str) -> str:
-    """Summarize a code file using the model."""
+    """Summarize a code file using the model. Large files are truncated based on token count."""
     try:
         content = read_local_file(normalize_path(file_path))
     except Exception as e:
         return f"Error reading file: {e}"
-    prompt = f"Summarize the following code:\n\n```\n{content[:20000]}\n```"
+
+    if tiktoken:
+        enc = tiktoken.get_encoding("cl100k_base")
+        tokens = enc.encode(content)
+        if len(tokens) > 8000:
+            content = enc.decode(tokens[:8000])
+
+    prompt = f"Summarize the following code:\n\n```\n{content}\n```"
+
     try:
         resp = client.chat.completions.create(
             model="mistralai/devstral-small:free",
@@ -452,6 +557,30 @@ def summarize_code(file_path: str) -> str:
         return resp.choices[0].message.content.strip()
     except Exception as e:
         return f"Error summarizing code: {e}"
+
+def git_status() -> str:
+    return run_bash("git status --short")
+
+def git_diff(path: str | None = None) -> str:
+    cmd = "git diff"
+    if path:
+        cmd += f" {shlex.quote(path)}"
+    return run_bash(cmd)
+
+def git_log(n: int = 5) -> str:
+    return run_bash(f"git log -n {n} --oneline")
+
+def git_add(path: str) -> str:
+    return run_bash(f"git add {shlex.quote(path)}")
+
+def run_build(command: str) -> str:
+    return run_bash(command)
+
+def manage_dependency(action: str, package: str) -> str:
+    if action not in {"install", "uninstall"}:
+        return "Error: action must be 'install' or 'uninstall'"
+    cmd = f"pip {action} {shlex.quote(package)}"
+    return run_bash(cmd)
 
 def show_diff_table(files_to_edit: List[FileToEdit]) -> None:
     if not files_to_edit:
@@ -482,6 +611,14 @@ def apply_diff_edit(path: str, original_snippet: str, new_snippet: str):
             raise ValueError(f"Ambiguous edit: {occurrences} matches")
         
         updated_content = content.replace(original_snippet, new_snippet, 1)
+        diff = "\n".join(difflib.unified_diff(
+            content.splitlines(),
+            updated_content.splitlines(),
+            fromfile="before",
+            tofile="after",
+            lineterm=""
+        ))
+        console.print(Panel(diff, title=f"Diff for {path}", border_style="green"))
         create_file(path, updated_content)
         console.print(f"[bold blue]✓[/bold blue] Applied diff edit to '[bright_cyan]{path}[/bright_cyan]'")
 
@@ -694,6 +831,22 @@ conversation_history = [
     {"role": "system", "content": system_PROMPT}
 ]
 
+def print_help() -> None:
+    table = Table(title="Available Tools", show_header=True, header_style="bold cyan")
+    table.add_column("Tool")
+    table.add_column("Description")
+    for t in tools:
+        name = t["function"]["name"]
+        desc = t["function"].get("description", "")
+        table.add_row(name, desc)
+    console.print(table)
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Devstral Engineer")
+    parser.add_argument('-v', '--verbose', action='store_true', help='verbose output')
+    parser.add_argument('--debug', action='store_true', help='debug output')
+    return parser.parse_args()
+
 # --------------------------------------------------------------------------------
 # 6. OpenAI API interaction with streaming
 # --------------------------------------------------------------------------------
@@ -785,7 +938,31 @@ def execute_function_call_dict(tool_call_dict) -> str:
         elif function_name == "summarize_code":
             file_path = arguments["file_path"]
             return summarize_code(file_path)
-            
+
+        elif function_name == "git_status":
+            return git_status()
+
+        elif function_name == "git_diff":
+            path = arguments.get("path")
+            return git_diff(path)
+
+        elif function_name == "git_log":
+            n = arguments.get("n", 5)
+            return git_log(n)
+
+        elif function_name == "git_add":
+            path = arguments["path"]
+            return git_add(path)
+
+        elif function_name == "run_build":
+            cmd = arguments["command"]
+            return run_build(cmd)
+
+        elif function_name == "manage_dependency":
+            action = arguments["action"]
+            package = arguments["package"]
+            return manage_dependency(action, package)
+
         else:
             return f"Unknown function: {function_name}"
             
@@ -849,21 +1026,31 @@ def execute_function_call(tool_call) -> str:
         return f"Error executing {function_name}: {str(e)}"
 
 def trim_conversation_history():
-    """Trim conversation history to prevent token limit issues while preserving tool call sequences"""
-    if len(conversation_history) <= 20:  # Don't trim if conversation is still small
+    """Trim conversation history based on token count."""
+    if not tiktoken:
+        # Fallback to simple length based trimming
+        if len(conversation_history) <= 20:
+            return
+        system_msgs = [m for m in conversation_history if m["role"] == "system"]
+        other_msgs = [m for m in conversation_history if m["role"] != "system"]
+        if len(other_msgs) > 15:
+            other_msgs = other_msgs[-15:]
+        conversation_history.clear()
+        conversation_history.extend(system_msgs + other_msgs)
         return
-        
-    # Always keep the system prompt
-    system_msgs = [msg for msg in conversation_history if msg["role"] == "system"]
-    other_msgs = [msg for msg in conversation_history if msg["role"] != "system"]
-    
-    # Keep only the last 15 messages to prevent token overflow
-    if len(other_msgs) > 15:
-        other_msgs = other_msgs[-15:]
-    
-    # Rebuild conversation history
-    conversation_history.clear()
-    conversation_history.extend(system_msgs + other_msgs)
+
+    TOKEN_LIMIT = 64000
+    encoder = tiktoken.get_encoding("cl100k_base")
+
+    def messages_token_count(msgs: List[Dict[str, Any]]) -> int:
+        return sum(len(encoder.encode(m.get("content") or "")) for m in msgs)
+
+    while messages_token_count(conversation_history) > TOKEN_LIMIT * 0.9:
+        # remove earliest non-system message
+        for i, m in enumerate(conversation_history):
+            if m["role"] != "system":
+                conversation_history.pop(i)
+                break
 
 def stream_openai_response(user_message: str):
     # Add the user message to conversation history
@@ -871,6 +1058,13 @@ def stream_openai_response(user_message: str):
     
     # Trim conversation history if it's getting too long
     trim_conversation_history()
+
+    if tiktoken:
+        encoder = tiktoken.get_encoding("cl100k_base")
+        total_tokens = sum(len(encoder.encode(m.get("content") or "")) for m in conversation_history)
+        TOKEN_LIMIT = 64000
+        if total_tokens > TOKEN_LIMIT * 0.8:
+            console.print(f"[bold yellow]⚠ Token usage: {total_tokens}/{TOKEN_LIMIT}[/bold yellow]")
 
     # Remove the old file guessing logic since we'll use function calls
     try:
@@ -1063,6 +1257,8 @@ def main():
 [bold bright_blue]🎯 Commands:[/bold bright_blue]
   • [bright_cyan]/undo[/bright_cyan] - Undo the last file change ([bright_cyan]/undo N[/bright_cyan] for multiple)
   • [bright_cyan]exit[/bright_cyan] or [bright_cyan]quit[/bright_cyan] - End the session
+  • [bright_cyan]/help[/bright_cyan] - Show available tools
+  • [bright_cyan]/edit[/bright_cyan] or [bright_cyan]/ask[/bright_cyan] - Switch modes
   • Just ask naturally - the AI will handle file operations automatically!"""
     
     console.print(Panel(
@@ -1093,6 +1289,21 @@ def main():
             console.print("[bold bright_blue]👋 Goodbye! Happy coding![/bold bright_blue]")
             break
 
+        if user_input.lower() == "/help":
+            print_help()
+            continue
+
+        if user_input.lower() == "/edit":
+            global MODE
+            MODE = "edit"
+            console.print("[bold cyan]Switched to EDIT mode[/bold cyan]")
+            continue
+
+        if user_input.lower() == "/ask":
+            MODE = "ask"
+            console.print("[bold cyan]Switched to ASK mode[/bold cyan]")
+            continue
+
         if try_handle_add_command(user_input):
             continue
 
@@ -1112,4 +1323,7 @@ def main():
     console.print("[bold blue]✨ Session finished. Thank you for using Devstral Engineer![/bold blue]")
 
 if __name__ == "__main__":
+    args = parse_args()
+    VERBOSE = args.verbose
+    DEBUG = args.debug
     main()

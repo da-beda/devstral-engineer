@@ -11,6 +11,7 @@ import shlex
 from openai import OpenAI
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from config import Config
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -54,10 +55,12 @@ prompt_session = PromptSession(
 # 1. Configure OpenAI client and load environment variables
 # --------------------------------------------------------------------------------
 load_dotenv()  # Load environment variables from .env file
+cfg = Config.load()
 client = OpenAI(
     base_url="https://openrouter.ai/api/v1",
-    api_key=os.getenv("OPENROUTER_API_KEY"),
+    api_key=cfg.api_key,
 )
+DEFAULT_MODEL = cfg.default_model
 
 # --------------------------------------------------------------------------------
 # 2. Define our schema using Pydantic for type safety
@@ -556,7 +559,7 @@ def summarize_code(file_path: str) -> str:
 
     try:
         resp = client.chat.completions.create(
-            model="mistralai/devstral-small:free",
+            model=DEFAULT_MODEL,
             messages=[{"role": "user", "content": prompt}],
         )
         return resp.choices[0].message.content.strip()
@@ -1130,7 +1133,7 @@ def stream_openai_response(user_message: str):
     # Remove the old file guessing logic since we'll use function calls
     try:
         stream = client.chat.completions.create(
-            model="mistralai/devstral-small:free",
+            model=DEFAULT_MODEL,
             messages=conversation_history,
             tools=tools,
             max_completion_tokens=64000,
@@ -1244,7 +1247,7 @@ def stream_openai_response(user_message: str):
                 console.print("\n[bold bright_blue]🔄 Processing results...[/bold bright_blue]")
                 
                 follow_up_stream = client.chat.completions.create(
-                    model="mistralai/devstral-small:free",
+                    model=DEFAULT_MODEL,
                     messages=conversation_history,
                     tools=tools,
                     max_completion_tokens=64000,

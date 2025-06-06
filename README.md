@@ -159,12 +159,14 @@ For when you want to preload files into conversation context:
    uv run -m devstral_cli        # start chatting
    ```
 
-   #### Using pip
-   ```bash
-   pip install -r requirements.txt
-   devstral setup  # one-time configuration
-   devstral        # start the chat
-   ```
+    #### Using pip
+    ```bash
+    pip install -r requirements.txt
+    devstral setup  # one-time configuration
+    devstral        # start the chat
+    ```
+
+    > **Important**: Run `uv sync` or `pip install -r requirements.txt` to ensure FastAPI and Pydantic are installed together without version mismatches.
 
 ### Usage Examples
 

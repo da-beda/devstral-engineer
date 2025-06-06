@@ -7,7 +7,7 @@ requires-python = ">=3.11"
 dependencies = [
     "openai>=1.58.1",
     "prompt-toolkit>=3.0.50",
-    "pydantic>=2.10.4",
+    "pydantic==2.10.4",
     "python-dotenv>=1.0.1",
     "rich>=13.9.4",
     "tiktoken>=0.7.0",
@@ -20,7 +20,7 @@ dependencies = [
     "numpy>=1.26.0",
     "pathspec>=0.12.1",
     "watchdog>=3.0.0",
-    "fastapi>=0.110.0",
+    "fastapi==0.110.0",
     "uvicorn>=0.29.0",
 ]
 

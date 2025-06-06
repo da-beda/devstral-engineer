@@ -130,8 +130,22 @@ For when you want to preload files into conversation context:
    cat > ~/.config/devstral-engineer/config.yaml <<'EOF'
    api_key: your_api_key_here
    default_model: mistralai/devstral-small:free
-   EOF
-   ```
+   indexing_enabled: true
+   index_engine_path: /path/to/code-index-engine
+   qdrant_url: http://localhost:6333
+   qdrant_api_key: your_qdrant_api_key
+    embedding:
+      provider: openai
+      model: text-embedding-3-small
+      api_key: your_openai_key
+    EOF
+    ```
+
+   **Configuration options**:
+   - `indexing_enabled`: enable the local code indexing engine
+   - `index_engine_path`: path to the index engine executable
+   - `qdrant_url` / `qdrant_api_key`: connection settings for your Qdrant instance
+   - `embedding`: settings for the embedding provider used by the engine
 
 3. **Install dependencies** (choose one method):
 

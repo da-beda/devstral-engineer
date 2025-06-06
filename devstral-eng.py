@@ -21,6 +21,9 @@ import time
 import argparse
 import difflib
 
+# DuckDuckGo helper for on-demand web search
+from ddg_search import ddg_search, ddg_results_to_markdown
+
 try:
     import tiktoken
 except Exception:
@@ -653,6 +656,40 @@ def try_handle_add_command(user_input: str) -> bool:
         return True
     return False
 
+
+def try_handle_search_command(user_input: str) -> bool:
+    """Handle '/search <query>' commands by fetching DuckDuckGo results."""
+    prefix = "/search "
+    if not user_input.lower().startswith(prefix):
+        return False
+
+    query = user_input[len(prefix):].strip()
+    if not query:
+        console.print("[bold yellow]⚠ Usage:[/bold yellow] /search <your query>")
+        return True
+
+    console.print(f"[bold blue]🔍 Searching DuckDuckGo for:[/bold blue] '{query}'")
+    try:
+        results = ddg_search(query, max_results=5)
+        if not results:
+            console.print("[bold yellow]⚠ No results found.[/bold yellow]")
+            conversation_history.append({
+                "role": "system",
+                "content": f"Search for '{query}' returned no results."
+            })
+            return True
+
+        md = ddg_results_to_markdown(results)
+        conversation_history.append({"role": "system", "content": md})
+        console.print(Panel(md, title="Search Results (Markdown)", border_style="cyan"))
+    except Exception as e:
+        console.print(f"[bold red]✗ DuckDuckGo search failed:[/bold red] {e}")
+        conversation_history.append({
+            "role": "system",
+            "content": f"Error performing DuckDuckGo search for '{query}': {e}"
+        })
+    return True
+
 def add_directory_to_conversation(directory_path: str):
     with console.status("[bold bright_blue]🔍 Scanning directory...[/bold bright_blue]") as status:
         excluded_files = {
@@ -1258,6 +1295,7 @@ def main():
   • [bright_cyan]/undo[/bright_cyan] - Undo the last file change ([bright_cyan]/undo N[/bright_cyan] for multiple)
   • [bright_cyan]exit[/bright_cyan] or [bright_cyan]quit[/bright_cyan] - End the session
   • [bright_cyan]/help[/bright_cyan] - Show available tools
+  • [bright_cyan]/search your query[/bright_cyan] - Inject DuckDuckGo search results
   • [bright_cyan]/edit[/bright_cyan] or [bright_cyan]/ask[/bright_cyan] - Switch modes
   • Just ask naturally - the AI will handle file operations automatically!"""
     
@@ -1305,6 +1343,9 @@ def main():
             continue
 
         if try_handle_add_command(user_input):
+            continue
+
+        if try_handle_search_command(user_input):
             continue
 
         if user_input.lower().startswith("/undo"):

@@ -75,6 +75,8 @@ The AI can automatically execute these operations when needed:
 - Trigger project build systems
 #### `manage_dependency(action: str, package: str)`
 - Install or uninstall dependencies via pip
+#### `search_code(query: str, directory_prefix: str)`
+- Search indexed code snippets optionally filtered by directory
 
 ### 📁 **File Operations**
 
@@ -95,6 +97,7 @@ For when you want to preload files into conversation context:
 - **`/undo`** - Undo the last file change (`/undo N` for multiple steps)
 - **`/search your query`** - Fetch DuckDuckGo results and add them as context
 - **`/deep-research your query`** - Fetch articles for multi-page research
+- **`/code-search your query`** - Search your indexed workspace
 
 **Note**: The `/add` command is mainly useful when you want to provide extra context upfront. The AI can read files automatically via function calls whenever needed during the conversation.
 
@@ -215,6 +218,16 @@ You> Now review this codebase structure
 🤖 Assistant> I've reviewed your codebase and found several areas for improvement:
 
 1. **Error Handling**: The utils.py file could benefit from more robust error handling...
+```
+
+#### **Indexed Code Search**
+```
+You> /code-search foo
+
+src/foo.py
+```python
+def foo():
+    pass
 ```
 
 ## Technical Details

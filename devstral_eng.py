@@ -32,6 +32,8 @@ from ddg_deep import deep_research
 from conversation_store import load_history, save_history
 import asyncio
 from code_index_engine.client import IndexClient
+import threading
+import urllib.request
 
 try:
     import tiktoken
@@ -54,6 +56,72 @@ MODE = "ask"
 ENGINE_PORT = 8001
 engine_proc: subprocess.Popen | None = None
 index_client = IndexClient(f"http://127.0.0.1:{ENGINE_PORT}")
+STATUS_POLL_INTERVAL = 5.0
+status_stop_event = threading.Event()
+status_thread: threading.Thread | None = None
+
+
+def launch_engine(port: int = ENGINE_PORT) -> None:
+    """Start the indexing engine subprocess and initialize it."""
+    global engine_proc, index_client, ENGINE_PORT
+    ENGINE_PORT = port
+    index_client = IndexClient(f"http://127.0.0.1:{ENGINE_PORT}")
+    console.log(f"Starting index engine on port {ENGINE_PORT}")
+    engine_proc = subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "code_index_engine.api:app", "--port", str(ENGINE_PORT)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    # wait for status endpoint
+    for _ in range(20):
+        try:
+            asyncio.run(index_client.status())
+            break
+        except Exception:
+            time.sleep(0.5)
+    try:
+        asyncio.run(index_client.start(str(Path.cwd())))
+    except Exception:
+        pass
+
+
+def poll_engine_status() -> None:
+    """Thread target that polls the engine status endpoint."""
+    url = f"http://127.0.0.1:{ENGINE_PORT}/status"
+    while not status_stop_event.is_set():
+        running = False
+        try:
+            with urllib.request.urlopen(url, timeout=2) as resp:
+                data = json.load(resp)
+                running = data.get("status") == "running"
+        except Exception as exc:
+            console.log(f"[red]Engine status check failed: {exc}[/red]")
+
+        if not running:
+            console.log("[yellow]Engine not responding, attempting restart...[/yellow]")
+            if engine_proc is None or engine_proc.poll() is not None:
+                try:
+                    launch_engine(ENGINE_PORT)
+                except Exception as exc:  # pragma: no cover - restart failure edge
+                    console.log(f"[red]Failed to restart engine: {exc}[/red]")
+        status_stop_event.wait(STATUS_POLL_INTERVAL)
+
+
+def start_status_thread() -> None:
+    """Start the background status polling thread."""
+    global status_thread
+    if status_thread and status_thread.is_alive():
+        return
+    status_stop_event.clear()
+    status_thread = threading.Thread(target=poll_engine_status, daemon=True)
+    status_thread.start()
+
+
+def stop_status_thread() -> None:
+    """Signal the polling thread to stop and wait for it."""
+    status_stop_event.set()
+    if status_thread:
+        status_thread.join(timeout=5)
 
 # Initialize Rich console and prompt session
 console = Console()
@@ -1879,21 +1947,8 @@ async def main():
     global engine_proc
 
     # Launch indexing engine subprocess
-    engine_proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "code_index_engine.api:app", "--port", str(ENGINE_PORT)],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    for _ in range(20):
-        try:
-            await index_client.status()
-            break
-        except Exception:
-            await asyncio.sleep(0.5)
-    try:
-        await index_client.start(str(Path.cwd()))
-    except Exception:
-        pass
+    launch_engine(ENGINE_PORT)
+    start_status_thread()
 
     # Create a beautiful gradient-style welcome panel
     welcome_text = """[bold bright_blue]🐋 Devstral Engineer[/bold bright_blue] [bright_cyan]with Function Calling[/bright_cyan]
@@ -2037,6 +2092,7 @@ async def main():
             await index_client.stop()
         except Exception:
             pass
+        stop_status_thread()
         engine_proc.terminate()
         try:
             engine_proc.wait(timeout=5)

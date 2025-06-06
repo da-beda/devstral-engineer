@@ -23,6 +23,8 @@ import difflib
 
 # DuckDuckGo helper for on-demand web search
 from ddg_search import ddg_search, ddg_results_to_markdown
+# Deep research helper for multi-page scraping
+from ddg_deep import deep_research
 
 try:
     import tiktoken
@@ -690,6 +692,28 @@ def try_handle_search_command(user_input: str) -> bool:
         })
     return True
 
+
+def try_handle_deep_command(user_input: str) -> bool:
+    """Handle '/deep-research <query>' for multi-page scraping."""
+    prefix = "/deep-research "
+    if not user_input.lower().startswith(prefix):
+        return False
+
+    query_terms = user_input[len(prefix):].strip()
+    if not query_terms:
+        console.print("[bold yellow]⚠ Usage:[/bold yellow] /deep-research <your query>")
+        return True
+
+    console.print(f"[bold blue]🔎 Starting Deep Research for:[/bold blue] '{query_terms}'")
+    try:
+        md_content = deep_research(query_terms)
+        conversation_history.append({"role": "system", "content": md_content})
+        console.print(Panel(md_content, title="Deep Research Results (Markdown)", border_style="magenta"))
+    except Exception as e:
+        console.print(f"[bold red]✗ Deep research failed:[/bold red] {e}")
+        conversation_history.append({"role": "system", "content": f"Error during deep research for '{query_terms}': {e}"})
+    return True
+
 def add_directory_to_conversation(directory_path: str):
     with console.status("[bold bright_blue]🔍 Scanning directory...[/bold bright_blue]") as status:
         excluded_files = {
@@ -1296,6 +1320,7 @@ def main():
   • [bright_cyan]exit[/bright_cyan] or [bright_cyan]quit[/bright_cyan] - End the session
   • [bright_cyan]/help[/bright_cyan] - Show available tools
   • [bright_cyan]/search your query[/bright_cyan] - Inject DuckDuckGo search results
+  • [bright_cyan]/deep-research your query[/bright_cyan] - Fetch articles for in-depth research
   • [bright_cyan]/edit[/bright_cyan] or [bright_cyan]/ask[/bright_cyan] - Switch modes
   • Just ask naturally - the AI will handle file operations automatically!"""
     
@@ -1346,6 +1371,9 @@ def main():
             continue
 
         if try_handle_search_command(user_input):
+            continue
+
+        if try_handle_deep_command(user_input):
             continue
 
         if user_input.lower().startswith("/undo"):

@@ -19,6 +19,7 @@ Devstral Engineer v2 is a powerful AI-powered coding assistant that provides an 
 - **Chain of Thought Reasoning**: Visible thought process before providing solutions
 - **Code Analysis & Discussion**: Expert-level insights and optimization suggestions
 - **Intelligent Problem Solving**: Automatic file reading and context understanding
+- **Built-in Web Search**: Fetch DuckDuckGo results on demand with `/search`
 
 ### 🛠️ **Function Calling Tools**
 The AI can automatically execute these operations when needed:
@@ -83,6 +84,7 @@ For when you want to preload files into conversation context:
 - **`/add path/to/file`** - Include single file in conversation context
 - **`/add path/to/folder`** - Include entire directory (with smart filtering)
 - **`/undo`** - Undo the last file change (`/undo N` for multiple steps)
+- **`/search your query`** - Fetch DuckDuckGo results and add them as context
 
 **Note**: The `/add` command is mainly useful when you want to provide extra context upfront. The AI can read files automatically via function calls whenever needed during the conversation.
 

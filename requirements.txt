@@ -5,3 +5,6 @@ rich
 prompt_toolkit
 tiktoken
 tree_sitter
+
+requests
+beautifulsoup4

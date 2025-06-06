@@ -1,7 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
 from typing import List, Optional
-import time
+import asyncio
 
 MAX_DDG_PAGES = 3
 RESULTS_PER_PAGE = 10
@@ -40,7 +40,11 @@ def parse_ddg_results(html: str) -> List[str]:
 def fetch_article_text(url: str) -> str:
     """Fetch the given URL and try to extract main textual content."""
     try:
-        resp = requests.get(url, headers={"User-Agent": "Mozilla/5.0 (Python) DevstralDeep/1.0"}, timeout=10)
+        resp = requests.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (Python) DevstralDeep/1.0"},
+            timeout=10,
+        )
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         art = soup.find("article")
@@ -57,11 +61,18 @@ def fetch_article_text(url: str) -> str:
         return ""
 
 
-def to_markdown(urls: List[str]) -> str:
+async def fetch_article_text_async(url: str) -> str:
+    """Async wrapper for fetch_article_text using thread executor."""
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, fetch_article_text, url)
+
+
+async def to_markdown(urls: List[str]) -> str:
     """Convert URLs to a Markdown document with snippets."""
     lines = ["### Deep Research Articles", ""]
-    for idx, link in enumerate(urls, start=1):
-        text = fetch_article_text(link)
+    tasks = [fetch_article_text_async(link) for link in urls]
+    texts = await asyncio.gather(*tasks)
+    for idx, (link, text) in enumerate(zip(urls, texts), start=1):
         if not text:
             lines.append(f"#### {idx}. [Failed to fetch {link}]")
             lines.append("")
@@ -77,16 +88,17 @@ def to_markdown(urls: List[str]) -> str:
         lines.append("")
         lines.append("</details>")
         lines.append("")
-        time.sleep(REQUEST_DELAY)
+        await asyncio.sleep(REQUEST_DELAY)
     return "\n".join(lines)
 
 
-def deep_research(query: str) -> str:
+async def deep_research(query: str) -> str:
     """Perform multi-page DuckDuckGo scraping and return Markdown."""
     collected: List[str] = []
+    loop = asyncio.get_event_loop()
     for page in range(MAX_DDG_PAGES):
         start_idx = page * RESULTS_PER_PAGE
-        html = fetch_ddg_page(query, start=start_idx)
+        html = await loop.run_in_executor(None, fetch_ddg_page, query, start_idx)
         if not html:
             break
         page_urls = parse_ddg_results(html)
@@ -97,7 +109,7 @@ def deep_research(query: str) -> str:
         more = soup.find("a", class_="result--more__btn")
         if not more:
             break
-        time.sleep(REQUEST_DELAY)
+        await asyncio.sleep(REQUEST_DELAY)
 
     unique_urls: List[str] = []
     seen = set()
@@ -106,7 +118,7 @@ def deep_research(query: str) -> str:
             seen.add(u)
             unique_urls.append(u)
 
-    md = to_markdown(unique_urls)
+    md = await to_markdown(unique_urls)
     if len(md) > SUMMARIZE_THRESHOLD:
         return f"*Deep research results exceed {SUMMARIZE_THRESHOLD} chars; please summarize below:*\n\n{md}"
     return md
@@ -114,5 +126,5 @@ def deep_research(query: str) -> str:
 
 if __name__ == "__main__":
     q = "python web scraping"
-    result = deep_research(q)
+    result = asyncio.run(deep_research(q))
     print(result[:2000])

@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from textwrap import dedent
 from typing import List, Dict, Any, Optional, Tuple
+import subprocess
+import shlex
 from openai import OpenAI
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -160,6 +162,120 @@ tools = [
             },
         }
     }
+    ,
+    {
+        "type": "function",
+        "function": {
+            "name": "list_directory",
+            "description": "List contents of a directory (ls -lA)",
+            "parameters": {
+                "type": "object",
+                "properties": {"path": {"type": "string", "description": "Directory path"}},
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "create_directory",
+            "description": "Create a new directory recursively",
+            "parameters": {
+                "type": "object",
+                "properties": {"dir_path": {"type": "string", "description": "Directory to create"}},
+                "required": ["dir_path"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_bash",
+            "description": "Execute a bash command (safe subset)",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "Command to run"},
+                    "timeout_ms": {"type": "integer", "description": "Timeout in ms", "default": 30000}
+                },
+                "required": ["command"]
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "tree_view",
+            "description": "Display directory tree",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Target path"},
+                    "depth": {"type": "integer", "description": "Depth limit"}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "run_tests",
+            "description": "Run tests using pytest",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "test_path": {"type": "string", "description": "Specific test path"},
+                    "options": {"type": "string", "description": "Additional options"}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "linter_checker",
+            "description": "Run a code linter like ruff",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Target path"},
+                    "linter_command": {"type": "string", "description": "Command to run", "default": "ruff check"}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "formatter",
+            "description": "Run a code formatter like black",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "path": {"type": "string", "description": "Target path"},
+                    "formatter_command": {"type": "string", "description": "Formatter command", "default": "black"}
+                },
+                "required": []
+            }
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "summarize_code",
+            "description": "Summarize a code file's purpose and structure",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "File to summarize"}
+                },
+                "required": ["file_path"]
+            }
+        }
+    }
 ]
 
 # --------------------------------------------------------------------------------
@@ -183,6 +299,12 @@ system_PROMPT = dedent("""\
        - create_file: Create or overwrite a single file
        - create_multiple_files: Create multiple files at once
        - edit_file: Make precise edits to existing files using snippet replacement
+       - list_directory: View directory contents
+       - create_directory: Create folders
+       - run_bash: Execute safe bash commands
+       - tree_view: Display directory tree
+       - run_tests: Run project tests
+       - summarize_code: Summarize large files
 
     Guidelines:
     1. Provide natural, conversational responses explaining your reasoning
@@ -238,6 +360,98 @@ def create_file(path: str, content: str):
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(content)
     console.print(f"[bold blue]✓[/bold blue] Created/updated file at '[bright_cyan]{file_path}[/bright_cyan]'")
+
+def create_directory(dir_path: str) -> str:
+    """Create a new directory recursively."""
+    try:
+        Path(dir_path).mkdir(parents=True, exist_ok=True)
+        return f"Successfully created directory: {dir_path}"
+    except Exception as e:
+        return f"Error creating directory: {e}"
+
+def list_directory(path: str = ".") -> str:
+    """List directory contents using ls -lA."""
+    try:
+        result = subprocess.run(["ls", "-lA", path], capture_output=True, text=True)
+        if result.returncode == 0:
+            return result.stdout
+        return f"Error listing directory: {result.stderr.strip()}"
+    except Exception as e:
+        return f"Error listing directory: {e}"
+
+def run_bash(command: str, timeout_ms: int = 30000) -> str:
+    """Run a bash command with basic safety."""
+    banned = ["curl", "wget", "nc", "netcat", "telnet", "ssh"]
+    if any(b in command.split() for b in banned):
+        return "Error: command contains banned subcommand"
+    try:
+        proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout, stderr = proc.communicate(timeout=timeout_ms/1000)
+        if proc.returncode == 0:
+            return stdout.strip()
+        return f"Command exited with {proc.returncode}\n{stderr}"
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        return "Error: command timed out"
+    except Exception as e:
+        return f"Error executing command: {e}"
+
+def tree_view(path: str = ".", depth: int = 2) -> str:
+    """Generate a simple directory tree."""
+    result = []
+    base_depth = Path(path).resolve().parts.__len__()
+    for root, dirs, files in os.walk(path):
+        level = Path(root).resolve().parts.__len__() - base_depth
+        if level > depth:
+            continue
+        indent = "  " * level
+        result.append(f"{indent}{Path(root).name}/")
+        for f in files:
+            result.append(f"{indent}  {f}")
+    return "\n".join(result)
+
+def _run_quality_command(cmd: list[str], name: str) -> str:
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True)
+        out = proc.stdout.strip()
+        err = proc.stderr.strip()
+        return f"{name} exit={proc.returncode}\n{out}\n{err}"
+    except FileNotFoundError:
+        return f"Error: {cmd[0]} not found"
+    except Exception as e:
+        return f"Error running {name}: {e}"
+
+def run_tests(test_path: str | None = None, options: str | None = None) -> str:
+    cmd = ["pytest"]
+    if options:
+        cmd.extend(shlex.split(options))
+    if test_path:
+        cmd.append(test_path)
+    return _run_quality_command(cmd, "pytest")
+
+def linter_checker(path: str = ".", linter_command: str = "ruff check") -> str:
+    cmd = shlex.split(linter_command) + [path]
+    return _run_quality_command(cmd, "linter")
+
+def formatter(path: str = ".", formatter_command: str = "black") -> str:
+    cmd = shlex.split(formatter_command) + [path]
+    return _run_quality_command(cmd, "formatter")
+
+def summarize_code(file_path: str) -> str:
+    """Summarize a code file using the model."""
+    try:
+        content = read_local_file(normalize_path(file_path))
+    except Exception as e:
+        return f"Error reading file: {e}"
+    prompt = f"Summarize the following code:\n\n```\n{content[:20000]}\n```"
+    try:
+        resp = client.chat.completions.create(
+            model="mistralai/devstral-small:free",
+            messages=[{"role": "user", "content": prompt}],
+        )
+        return resp.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Error summarizing code: {e}"
 
 def show_diff_table(files_to_edit: List[FileToEdit]) -> None:
     if not files_to_edit:
@@ -533,6 +747,44 @@ def execute_function_call_dict(tool_call_dict) -> str:
             
             apply_diff_edit(file_path, original_snippet, new_snippet)
             return f"Successfully edited file '{file_path}'"
+
+
+        elif function_name == "linter_checker":
+            path = arguments.get("path", ".")
+            cmd = arguments.get("linter_command", "ruff check")
+            return linter_checker(path, cmd)
+
+        elif function_name == "formatter":
+            path = arguments.get("path", ".")
+            cmd = arguments.get("formatter_command", "black")
+            return formatter(path, cmd)
+
+        elif function_name == "list_directory":
+            path = arguments.get("path", ".")
+            return list_directory(path)
+
+        elif function_name == "create_directory":
+            dir_path = arguments["dir_path"]
+            return create_directory(dir_path)
+
+        elif function_name == "run_bash":
+            command = arguments["command"]
+            timeout = arguments.get("timeout_ms", 30000)
+            return run_bash(command, timeout)
+
+        elif function_name == "tree_view":
+            path = arguments.get("path", ".")
+            depth = arguments.get("depth", 2)
+            return tree_view(path, depth)
+
+        elif function_name == "run_tests":
+            test_path = arguments.get("test_path")
+            options = arguments.get("options")
+            return run_tests(test_path, options)
+
+        elif function_name == "summarize_code":
+            file_path = arguments["file_path"]
+            return summarize_code(file_path)
             
         else:
             return f"Unknown function: {function_name}"
@@ -821,6 +1073,11 @@ def main():
         title_align="left"
     ))
     console.print()
+
+    # Orientation step: show initial directory listing
+    initial_ls = list_directory()
+    console.print(Panel(initial_ls, title="Current Directory", border_style="cyan"))
+    conversation_history.append({"role": "system", "content": f"Directory listing:\n{initial_ls}"})
 
     while True:
         try:

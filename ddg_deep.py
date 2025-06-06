@@ -74,9 +74,10 @@ async def fetch_article_text_async(url: str) -> str:
 async def to_markdown(urls: List[str]) -> str:
     """Convert URLs to a Markdown document with snippets."""
     lines = ["### Deep Research Articles", ""]
-    tasks = [fetch_article_text_async(link) for link in urls]
-    texts = await asyncio.gather(*tasks)
-    for idx, (link, text) in enumerate(zip(urls, texts), start=1):
+    for idx, link in enumerate(urls, start=1):
+        if idx > 1:
+            await asyncio.sleep(REQUEST_DELAY)
+        text = await fetch_article_text_async(link)
         if not text:
             lines.append(f"#### {idx}. [Failed to fetch {link}]")
             lines.append("")
@@ -92,7 +93,6 @@ async def to_markdown(urls: List[str]) -> str:
         lines.append("")
         lines.append("</details>")
         lines.append("")
-        await asyncio.sleep(REQUEST_DELAY)
     return "\n".join(lines)
 
 

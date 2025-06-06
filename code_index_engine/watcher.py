@@ -19,6 +19,13 @@ class _Handler(FileSystemEventHandler):
         if path in self.scanner.index:
             del self.scanner.index[path]
 
+    def on_moved(self, event):
+        src = Path(event.src_path)
+        dest = Path(event.dest_path)
+        if src in self.scanner.index:
+            del self.scanner.index[src]
+        self._handle(dest)
+
     def _handle(self, path_str: str):
         path = Path(path_str)
         if path.suffix in SUPPORTED_EXTENSIONS and path.is_file():

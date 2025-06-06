@@ -28,3 +28,20 @@ def test_watcher_updates_index(tmp_path):
         assert scanner.index[f].content == "a=2"
     finally:
         watcher.stop()
+
+
+def test_watcher_handles_rename(tmp_path):
+    f = tmp_path / "file.py"
+    f.write_text("a=1")
+    scanner = WorkspaceScanner(tmp_path)
+    scanner.scan()
+    watcher = WorkspaceWatcher(scanner)
+    watcher.start()
+    try:
+        new = tmp_path / "renamed.py"
+        f.rename(new)
+        time.sleep(0.5)
+        assert new in scanner.index
+        assert f not in scanner.index
+    finally:
+        watcher.stop()

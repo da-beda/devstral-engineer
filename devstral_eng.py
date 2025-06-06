@@ -646,11 +646,9 @@ def read_local_file(file_path: str) -> str:
 
 def create_file(path: str, content: str):
     """Create (or overwrite) a file at 'path' with the given 'content'."""
-    file_path = Path(path)
-
-    # Security checks
-    if any(part.startswith("~") for part in file_path.parts):
-        raise ValueError("Home directory references not allowed")
+    # Normalize and validate the provided path to avoid traversal or home refs
+    normalized = normalize_path(path)
+    file_path = Path(normalized)
 
     # Validate reasonable file size for operations
     if len(content) > 5_000_000:  # 5MB limit
@@ -675,8 +673,10 @@ def create_file(path: str, content: str):
 def create_directory(dir_path: str) -> str:
     """Create a new directory recursively."""
     try:
-        Path(dir_path).mkdir(parents=True, exist_ok=True)
-        return f"Successfully created directory: {dir_path}"
+        # Normalize and validate to keep operations within the workspace
+        normalized = normalize_path(dir_path)
+        Path(normalized).mkdir(parents=True, exist_ok=True)
+        return f"Successfully created directory: {normalized}"
     except Exception as e:
         return f"Error creating directory: {e}"
 
@@ -1572,14 +1572,15 @@ async def execute_function_call_dict(tool_call_dict) -> str:
             file_path = arguments["file_path"]
             content = arguments["content"]
             create_file(file_path, content)
-            return f"Successfully created file '{file_path}'"
+            return f"Successfully created file '{normalize_path(file_path)}'"
 
         elif function_name == "create_multiple_files":
             files = arguments["files"]
             created_files = []
             for file_info in files:
-                create_file(file_info["path"], file_info["content"])
-                created_files.append(file_info["path"])
+                p = normalize_path(file_info["path"])
+                create_file(p, file_info["content"])
+                created_files.append(p)
             return f"Successfully created {len(created_files)} files: {', '.join(created_files)}"
 
         elif function_name == "edit_file":
@@ -1712,14 +1713,15 @@ async def execute_function_call(tool_call) -> str:
             file_path = arguments["file_path"]
             content = arguments["content"]
             create_file(file_path, content)
-            return f"Successfully created file '{file_path}'"
+            return f"Successfully created file '{normalize_path(file_path)}'"
 
         elif function_name == "create_multiple_files":
             files = arguments["files"]
             created_files = []
             for file_info in files:
-                create_file(file_info["path"], file_info["content"])
-                created_files.append(file_info["path"])
+                p = normalize_path(file_info["path"])
+                create_file(p, file_info["content"])
+                created_files.append(p)
             return f"Successfully created {len(created_files)} files: {', '.join(created_files)}"
 
         elif function_name == "edit_file":

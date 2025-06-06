@@ -90,3 +90,22 @@ async def test_deep_research_aggregates_pages(monkeypatch):
     assert "http://a.com" in md
     assert "http://b.com" in md
     assert "http://c.com" in md
+
+
+@pytest.mark.asyncio
+async def test_to_markdown_throttles_before_fetch(monkeypatch):
+    calls = []
+
+    async def fake_fetch(url):
+        calls.append(f"fetch:{url}")
+        return "text"
+
+    async def fake_sleep(delay):
+        calls.append(f"sleep:{delay}")
+
+    monkeypatch.setattr("ddg_deep.fetch_article_text_async", fake_fetch)
+    monkeypatch.setattr("ddg_deep.asyncio.sleep", fake_sleep)
+    from ddg_deep import to_markdown, REQUEST_DELAY
+
+    await to_markdown(["u1", "u2"])
+    assert calls == ["fetch:u1", f"sleep:{REQUEST_DELAY}", "fetch:u2"]

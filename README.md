@@ -60,6 +60,7 @@ You> Look at src/utils.py and tests/test_utils.py
 For when you want to preload files into conversation context:
 - **`/add path/to/file`** - Include single file in conversation context
 - **`/add path/to/folder`** - Include entire directory (with smart filtering)
+- **`/undo`** - Undo the last file change (`/undo N` for multiple steps)
 
 **Note**: The `/add` command is mainly useful when you want to provide extra context upfront. The AI can read files automatically via function calls whenever needed during the conversation.
 

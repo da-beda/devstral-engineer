@@ -5,7 +5,7 @@ import sys
 import json
 from pathlib import Path
 from textwrap import dedent
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from openai import OpenAI
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -205,6 +205,9 @@ system_PROMPT = dedent("""\
 # 4. Helper functions 
 # --------------------------------------------------------------------------------
 
+
+file_history: List[Tuple[str, str, Optional[str]]] = []
+
 def read_local_file(file_path: str) -> str:
     """Return the text content of a local file."""
     with open(file_path, "r", encoding="utf-8") as f:
@@ -224,6 +227,14 @@ def create_file(path: str, content: str):
         raise ValueError("File content exceeds 5MB size limit")
     
     file_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if file_path.exists():
+        with open(file_path, "r", encoding="utf-8") as f:
+            backup_content = f.read()
+        file_history.append(("edit", str(file_path), backup_content))
+    else:
+        file_history.append(("create", str(file_path), None))
+
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(content)
     console.print(f"[bold blue]✓[/bold blue] Created/updated file at '[bright_cyan]{file_path}[/bright_cyan]'")
@@ -435,6 +446,32 @@ def normalize_path(path_str: str) -> str:
         raise ValueError(f"Invalid path: {path_str} contains parent directory references")
     
     return str(path)
+
+def undo_last_change(num_undos: int = 1):
+    """Undo the most recent file creation or edit operations."""
+    if not file_history:
+        console.print("[bold yellow]ℹ No changes to undo.[/bold yellow]")
+        return
+
+    for _ in range(num_undos):
+        if not file_history:
+            console.print("[bold yellow]ℹ No more changes to undo.[/bold yellow]")
+            break
+
+        action, path, backup = file_history.pop()
+        try:
+            if action == "create":
+                if os.path.exists(path):
+                    os.remove(path)
+                    console.print(f"[bold blue]✓[/bold blue] Deleted file '[bright_cyan]{path}[/bright_cyan]' (undo creation)")
+            elif action == "edit":
+                Path(path).parent.mkdir(parents=True, exist_ok=True)
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(backup or "")
+                console.print(f"[bold blue]✓[/bold blue] Restored file '[bright_cyan]{path}[/bright_cyan]' (undo edit)")
+        except Exception as e:
+            console.print(f"[bold red]✗ Failed to undo change: {e}[/bold red]")
+            break
 
 # --------------------------------------------------------------------------------
 # 5. Conversation state
@@ -772,6 +809,7 @@ def main():
   • [dim]The AI can automatically read and create files using function calls[/dim]
 
 [bold bright_blue]🎯 Commands:[/bold bright_blue]
+  • [bright_cyan]/undo[/bright_cyan] - Undo the last file change ([bright_cyan]/undo N[/bright_cyan] for multiple)
   • [bright_cyan]exit[/bright_cyan] or [bright_cyan]quit[/bright_cyan] - End the session
   • Just ask naturally - the AI will handle file operations automatically!"""
     
@@ -799,6 +837,14 @@ def main():
             break
 
         if try_handle_add_command(user_input):
+            continue
+
+        if user_input.lower().startswith("/undo"):
+            try:
+                num_undos = int(user_input.split()[1]) if len(user_input.split()) > 1 else 1
+                undo_last_change(num_undos)
+            except ValueError:
+                console.print("[bold red]✗ Invalid number of undos. Usage: /undo [N][/bold red]")
             continue
 
         response_data = stream_openai_response(user_input)

@@ -22,7 +22,7 @@ def test_search_code_returns_matches(tmp_path):
     sample = tmp_path / "match.py"
     sample.write_text("def foo(): pass")
     port = 8600
-    devstral_eng.launch_engine(port)
+    devstral_eng.launch_engine(port, debug=False)
     asyncio.run(wait_for_status(devstral_eng.index_client))
     asyncio.run(devstral_eng.index_client.start(str(tmp_path)))
     try:
@@ -43,7 +43,7 @@ def test_search_code_directory_filter(tmp_path):
     f1.write_text("def bar(): pass")
     f2.write_text("def bar(): pass")
     port = 8601
-    devstral_eng.launch_engine(port)
+    devstral_eng.launch_engine(port, debug=False)
     asyncio.run(wait_for_status(devstral_eng.index_client))
     asyncio.run(devstral_eng.index_client.start(str(tmp_path)))
     try:

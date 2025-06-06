@@ -15,8 +15,17 @@ app = typer.Typer(
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
-    debug: bool = typer.Option(False, "--debug", help="Debug output with profiling"),
+    verbose: bool = typer.Option(
+        False,
+        "--verbose",
+        "-v",
+        help="Verbose output (show engine logs)",
+    ),
+    debug: bool = typer.Option(
+        False,
+        "--debug",
+        help="Debug output with profiling and engine logs",
+    ),
 ) -> None:
     """Start interactive chat when no subcommand is provided."""
     if ctx.invoked_subcommand is None:

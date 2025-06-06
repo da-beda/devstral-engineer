@@ -18,3 +18,5 @@ watchdog>=3.0.0
 fastapi>=0.110.0
 uvicorn>=0.29.0
 numpy>=1.26.0
+pytest>=8.4.0
+pytest-asyncio>=0.23.6

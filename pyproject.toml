@@ -21,3 +21,9 @@ dependencies = [
 
 [project.scripts]
 devstral = "devstral_cli:app"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.4.0",
+    "pytest-asyncio>=0.23.6",
+]

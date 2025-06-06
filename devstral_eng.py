@@ -892,7 +892,7 @@ def try_handle_add_command(user_input: str) -> bool:
             else:
                 # Handle a single file as before
                 content = read_local_file(normalized_path)
-                conversation_history.append(
+                add_to_history(
                     {
                         "role": "system",
                         "content": f"Content of file '{normalized_path}':\n\n{content}",
@@ -925,7 +925,7 @@ def try_handle_search_command(user_input: str) -> bool:
         results = ddg_search(query, max_results=5)
         if not results:
             console.print("[bold yellow]⚠ No results found.[/bold yellow]")
-            conversation_history.append(
+            add_to_history(
                 {
                     "role": "system",
                     "content": f"Search for '{query}' returned no results.",
@@ -934,11 +934,11 @@ def try_handle_search_command(user_input: str) -> bool:
             return True
 
         md = ddg_results_to_markdown(results)
-        conversation_history.append({"role": "system", "content": md})
+        add_to_history({"role": "system", "content": md})
         console.print(Panel(md, title="Search Results (Markdown)", border_style="cyan"))
     except Exception as e:
         console.print(f"[bold red]✗ DuckDuckGo search failed:[/bold red] {e}")
-        conversation_history.append(
+        add_to_history(
             {
                 "role": "system",
                 "content": f"Error performing DuckDuckGo search for '{query}': {e}",
@@ -963,7 +963,7 @@ def try_handle_deep_command(user_input: str) -> bool:
     )
     try:
         md_content = deep_research(query_terms)
-        conversation_history.append({"role": "system", "content": md_content})
+        add_to_history({"role": "system", "content": md_content})
         console.print(
             Panel(
                 md_content,
@@ -973,7 +973,7 @@ def try_handle_deep_command(user_input: str) -> bool:
         )
     except Exception as e:
         console.print(f"[bold red]✗ Deep research failed:[/bold red] {e}")
-        conversation_history.append(
+        add_to_history(
             {
                 "role": "system",
                 "content": f"Error during deep research for '{query_terms}': {e}",
@@ -1150,7 +1150,7 @@ def add_directory_to_conversation(directory_path: str):
 
                     normalized_path = normalize_path(full_path)
                     content = read_local_file(normalized_path)
-                    conversation_history.append(
+                    add_to_history(
                         {
                             "role": "system",
                             "content": f"Content of file '{normalized_path}':\n\n{content}",
@@ -1201,7 +1201,7 @@ def ensure_file_in_context(file_path: str) -> bool:
         content = read_local_file(normalized_path)
         file_marker = f"Content of file '{normalized_path}'"
         if not any(file_marker in msg["content"] for msg in conversation_history):
-            conversation_history.append(
+            add_to_history(
                 {"role": "system", "content": f"{file_marker}:\n\n{content}"}
             )
         return True
@@ -1260,6 +1260,32 @@ def undo_last_change(num_undos: int = 1):
 # 5. Conversation state
 # --------------------------------------------------------------------------------
 conversation_history = [{"role": "system", "content": system_PROMPT}]
+
+
+def _manage_context_window(token_limit: int = 64000, reserve_tokens: int = 1000) -> None:
+    """Trim conversation history based on token count similar to Gemini Code."""
+    if not tiktoken:
+        trim_conversation_history()
+        return
+
+    encoder = tiktoken.get_encoding("cl100k_base")
+
+    def token_count(msgs: List[Dict[str, Any]]) -> int:
+        return sum(len(encoder.encode(m.get("content") or "")) for m in msgs)
+
+    while token_count(conversation_history) > token_limit - reserve_tokens:
+        for i, m in enumerate(conversation_history):
+            if m.get("role") != "system":
+                conversation_history.pop(i)
+                break
+        else:
+            break
+
+
+def add_to_history(message: Dict[str, Any]) -> None:
+    """Append a message and manage context size."""
+    conversation_history.append(message)
+    _manage_context_window()
 
 
 def print_help() -> None:
@@ -1513,10 +1539,7 @@ def trim_conversation_history():
 
 def stream_openai_response(user_message: str):
     # Add the user message to conversation history
-    conversation_history.append({"role": "user", "content": user_message})
-
-    # Trim conversation history if it's getting too long
-    trim_conversation_history()
+    add_to_history({"role": "user", "content": user_message})
 
     if tiktoken:
         encoder = tiktoken.get_encoding("cl100k_base")
@@ -1631,7 +1654,7 @@ def stream_openai_response(user_message: str):
                     assistant_message["content"] = None
 
                 assistant_message["tool_calls"] = formatted_tool_calls
-                conversation_history.append(assistant_message)
+                add_to_history(assistant_message)
 
                 # Execute tool calls and add results immediately
                 console.print(
@@ -1651,13 +1674,13 @@ def stream_openai_response(user_message: str):
                             "tool_call_id": tool_call["id"],
                             "content": result,
                         }
-                        conversation_history.append(tool_response)
+                        add_to_history(tool_response)
                     except Exception as e:
                         console.print(
                             f"[red]Error executing {tool_call['function']['name']}: {e}[/red]"
                         )
                         # Still need to add a tool response even on error
-                        conversation_history.append(
+                        add_to_history(
                             {
                                 "role": "tool",
                                 "tool_call_id": tool_call["id"],
@@ -1710,12 +1733,10 @@ def stream_openai_response(user_message: str):
                 console.print()
 
                 # Store follow-up response
-                conversation_history.append(
-                    {"role": "assistant", "content": follow_up_content}
-                )
+                add_to_history({"role": "assistant", "content": follow_up_content})
         else:
             # No tool calls, just store the regular response
-            conversation_history.append(assistant_message)
+            add_to_history(assistant_message)
 
         return {"success": True}
 
@@ -1774,9 +1795,7 @@ def main():
     # Orientation step: show initial directory listing
     initial_ls = list_directory()
     console.print(Panel(initial_ls, title="Current Directory", border_style="cyan"))
-    conversation_history.append(
-        {"role": "system", "content": f"Directory listing:\n{initial_ls}"}
-    )
+    add_to_history({"role": "system", "content": f"Directory listing:\n{initial_ls}"})
 
     while True:
         try:

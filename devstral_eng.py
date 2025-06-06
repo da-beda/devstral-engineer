@@ -9,6 +9,7 @@ import re
 import subprocess
 import shlex
 from openai import AsyncOpenAI
+from planner import plan_steps
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from config import Config
@@ -1348,6 +1349,16 @@ def parse_args():
     return parser.parse_args()
 
 
+def is_complex_request(text: str) -> bool:
+    """Heuristic to decide if a request might need planning."""
+    lowered = text.lower()
+    if len(text.split()) > 25:
+        return True
+    if " and " in lowered or " then " in lowered:
+        return True
+    return False
+
+
 def print_profiling_stats() -> None:
     """Display simple profiling statistics."""
     if not DEBUG:
@@ -1915,6 +1926,34 @@ async def main():
                 console.print(
                     "[bold red]✗ Invalid number of undos. Usage: /undo [N][/bold red]"
                 )
+            continue
+
+        plan_requested = False
+        request_text = user_input
+        if user_input.lower().startswith("/plan"):
+            request_text = user_input[len("/plan") :].strip()
+            plan_requested = True
+        elif is_complex_request(user_input):
+            plan_requested = True
+
+        if plan_requested:
+            console.print("[bold cyan]🗺 Planning steps...[/bold cyan]")
+            plan = await plan_steps(request_text, tools)
+            if not plan:
+                console.print("[bold yellow]⚠ Planner produced no steps[/bold yellow]")
+            for step in plan:
+                name = step.get("tool")
+                args = step.get("args", {})
+                console.print(f"[bright_blue]→ {name}[/bright_blue] {args}")
+                tool_call = {
+                    "id": f"plan_{name}_{int(time.time()*1000)}",
+                    "type": "function",
+                    "function": {"name": name, "arguments": json.dumps(args)},
+                }
+                result = await execute_function_call_dict(tool_call)
+                console.print(result)
+                add_to_history({"role": "tool", "tool_call_id": tool_call["id"], "content": result})
+            await stream_openai_response(f"Finished executing planned steps for: {request_text}")
             continue
 
         response_data = await stream_openai_response(user_input)

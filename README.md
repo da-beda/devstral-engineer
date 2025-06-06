@@ -250,6 +250,19 @@ You> Analyze this entire project and suggest a refactoring plan
 Based on my analysis of your project, here's a comprehensive refactoring plan...
 ```
 
+### **Autonomous Planning**
+```
+You> /plan Build and test a hello.py script that prints "hi"
+
+🗺 Planning steps...
+→ create_file {'file_path': 'hello.py', 'content': 'print("hi")'}
+Successfully created file 'hello.py'
+→ run_tests {'test_path': None}
+All tests passed.
+
+🤖 Assistant> I created the file and ran the tests. Everything looks good!
+```
+
 ## File Operations Comparison
 
 | Method | When to Use | How It Works |

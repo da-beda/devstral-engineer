@@ -42,3 +42,9 @@ def search(req: SearchRequest):
         raise HTTPException(status_code=400, detail='not started')
     blocks = scanner.search(req.query, req.top_k)
     return [{'path':str(b.path), 'content':b.content[:200]} for b in blocks]
+
+
+@app.get('/status')
+def status() -> dict:
+    """Return running status for health checks."""
+    return {'status': 'running' if scanner else 'not_started'}

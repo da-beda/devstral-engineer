@@ -65,3 +65,34 @@ def clear_history_cmd() -> None:
     """Delete the stored conversation history."""
     clear_history()
     typer.echo("Conversation history cleared.")
+
+
+@app.command("code-search")
+def code_search(query: str, top_k: int = 5) -> None:
+    """Search indexed code via the local indexing engine."""
+    from code_index_engine.client import IndexClient
+    import asyncio
+
+    client = IndexClient()
+
+    async def _run():
+        return await client.search(query, top_k)
+
+    results = asyncio.run(_run())
+    for item in results:
+        typer.echo(f"{item['path']}\n{item['content']}\n")
+
+
+@app.command("index-status")
+def index_status() -> None:
+    """Check if the indexing engine is running."""
+    from code_index_engine.client import IndexClient
+    import asyncio
+
+    client = IndexClient()
+
+    async def _run():
+        return await client.status()
+
+    res = asyncio.run(_run())
+    typer.echo(res.get("status", "unknown"))

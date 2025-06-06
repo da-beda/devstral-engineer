@@ -43,6 +43,22 @@ The AI can automatically execute these operations when needed:
 #### `edit_file(file_path: str, original_snippet: str, new_snippet: str)`
 - Precise snippet-based file editing
 - Safe replacement with exact matching
+#### `list_directory(path: str)`
+- List files in a directory
+#### `create_directory(dir_path: str)`
+- Create directories recursively
+#### `run_bash(command: str, timeout_ms: int)`
+- Execute safe shell commands
+#### `tree_view(path: str, depth: int)`
+- Display a directory tree
+#### `run_tests(test_path: str, options: str)`
+- Run project tests via pytest
+#### `linter_checker(path: str, linter_command: str)`
+- Run a code linter like ruff
+#### `formatter(path: str, formatter_command: str)`
+- Run a code formatter like black
+#### `summarize_code(file_path: str)`
+- Summarize a large code file for quick context
 
 ### 📁 **File Operations**
 

@@ -2,6 +2,9 @@ import aiohttp
 from bs4 import BeautifulSoup
 from typing import List, Optional
 import asyncio
+from rich.console import Console
+
+console = Console()
 
 MAX_DDG_PAGES = 3
 RESULTS_PER_PAGE = 10
@@ -23,7 +26,7 @@ async def fetch_ddg_page(query: str, start: int = 0) -> Optional[str]:
                 resp.raise_for_status()
                 return await resp.text()
     except Exception as e:
-        print(f"[ddg_deep] Error fetching page {start}: {e}")
+        console.log(f"[ddg_deep] Error fetching page {start}: {e}")
         return None
 
 

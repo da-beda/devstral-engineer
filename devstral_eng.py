@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import json
 from pathlib import Path
 from textwrap import dedent
@@ -16,7 +15,6 @@ from config import Config
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.style import Style
 import questionary
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style as PromptStyle
@@ -36,7 +34,7 @@ except Exception:
     tiktoken = None
 
 try:
-    from tree_sitter import Language, Parser
+    from tree_sitter import Parser
 except Exception:
     Parser = None
 
@@ -120,6 +118,30 @@ tools = [
                     }
                 },
                 "required": ["file_paths"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "view",
+            "description": "View a portion of a file with optional offset and limit",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "file_path": {"type": "string", "description": "File to view"},
+                    "offset": {
+                        "type": "integer",
+                        "description": "Starting line number",
+                        "default": 0,
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Maximum number of lines",
+                        "default": 40,
+                    },
+                },
+                "required": ["file_path"],
             },
         },
     },
@@ -469,6 +491,7 @@ system_PROMPT = dedent(
     2. File Operations (via function calls):
        - read_file: Read a single file's content
        - read_multiple_files: Read multiple files at once
+       - view: View a portion of a file
        - create_file: Create or overwrite a single file
        - create_multiple_files: Create multiple files at once
        - edit_file: Make precise edits to existing files using snippet replacement
@@ -521,7 +544,6 @@ def create_file(path: str, content: str):
     # Security checks
     if any(part.startswith("~") for part in file_path.parts):
         raise ValueError("Home directory references not allowed")
-    normalized_path = normalize_path(str(file_path))
 
     # Validate reasonable file size for operations
     if len(content) > 5_000_000:  # 5MB limit
@@ -683,6 +705,40 @@ def glob(pattern: str, cwd: str = ".") -> str:
     if len(matches) > 200:
         return "\n".join(matches[:200]) + f"\n... ({len(matches)-200} more)"
     return "\n".join(matches)
+
+
+def view(file_path: str, offset: int = 0, limit: int = 40) -> str:
+    """Return a slice of a text file starting at line ``offset``.
+
+    ``limit`` specifies the maximum number of lines to display. If the file
+    contains more than 400 lines, a summary generated via ``summarize_code`` is
+    appended to the output.
+    """
+
+    try:
+        normalized_path = normalize_path(file_path)
+        if is_binary_file(normalized_path):
+            return "Error: target appears to be a binary file"
+        with open(normalized_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception as e:
+        return f"Error reading file: {e}"
+
+    total = len(lines)
+    if offset < 0:
+        offset = max(total + offset, 0)
+    start = min(offset, total)
+    end = min(start + limit, total) if limit > 0 else total
+    snippet = "".join(lines[start:end])
+    result = snippet
+    if end < total:
+        result += f"\n... ({total - end} more lines)"
+
+    if total > 400:
+        summary = summarize_code(normalized_path)
+        result += f"\n\nSummary:\n{summary}"
+
+    return result.strip()
 
 
 def summarize_code(file_path: str) -> str:
@@ -1253,6 +1309,12 @@ def execute_function_call_dict(tool_call_dict) -> str:
                     results.append(f"Error reading '{file_path}': {e}")
             return "\n\n" + "=" * 50 + "\n\n".join(results)
 
+        elif function_name == "view":
+            file_path = arguments["file_path"]
+            offset = arguments.get("offset", 0)
+            limit = arguments.get("limit", 40)
+            return view(file_path, offset, limit)
+
         elif function_name == "create_file":
             file_path = arguments["file_path"]
             content = arguments["content"]
@@ -1381,6 +1443,12 @@ def execute_function_call(tool_call) -> str:
                 except OSError as e:
                     results.append(f"Error reading '{file_path}': {e}")
             return "\n\n" + "=" * 50 + "\n\n".join(results)
+
+        elif function_name == "view":
+            file_path = arguments["file_path"]
+            offset = arguments.get("offset", 0)
+            limit = arguments.get("limit", 40)
+            return view(file_path, offset, limit)
 
         elif function_name == "create_file":
             file_path = arguments["file_path"]

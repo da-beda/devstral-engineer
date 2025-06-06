@@ -8,6 +8,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import re
 import subprocess
 import shlex
+import sys
 from openai import AsyncOpenAI
 from planner import plan_steps
 from pydantic import BaseModel
@@ -30,6 +31,7 @@ from ddg_search import async_ddg_search, ddg_results_to_markdown
 from ddg_deep import deep_research
 from conversation_store import load_history, save_history
 import asyncio
+from code_index_engine.client import IndexClient
 
 try:
     import tiktoken
@@ -48,6 +50,10 @@ PROFILE_DATA = {
     "trim_conversation_history": {"calls": 0, "total": 0.0},
 }
 MODE = "ask"
+
+ENGINE_PORT = 8001
+engine_proc: subprocess.Popen | None = None
+index_client = IndexClient(f"http://127.0.0.1:{ENGINE_PORT}")
 
 # Initialize Rich console and prompt session
 console = Console()
@@ -989,6 +995,38 @@ async def try_handle_deep_command(user_input: str) -> bool:
     return True
 
 
+async def try_handle_code_search_command(user_input: str) -> bool:
+    """Handle '/code-search <query>' to search indexed code."""
+    prefix = "/code-search "
+    if not user_input.lower().startswith(prefix):
+        return False
+
+    query = user_input[len(prefix):].strip()
+    if not query:
+        console.print("[bold yellow]⚠ Usage:[/bold yellow] /code-search <query>")
+        return True
+
+    try:
+        results = await index_client.search(query)
+        if not results:
+            console.print("[bold yellow]⚠ No code matches found.[/bold yellow]")
+            return True
+        lines = [f"[cyan]{r['path']}[/cyan]\n{r['content']}" for r in results]
+        content = "\n\n".join(lines)
+        console.print(
+            Panel(content, title="Code Search Results", border_style="green")
+        )
+        add_to_history(
+            {
+                "role": "system",
+                "content": f"Code search results for '{query}':\n{content}",
+            }
+        )
+    except Exception as e:
+        console.print(f"[bold red]✗ Code search failed:[/bold red] {e}")
+    return True
+
+
 async def add_directory_to_conversation(directory_path: str):
     with console.status(
         "[bold bright_blue]🔍 Scanning directory...[/bold bright_blue]"
@@ -1838,6 +1876,25 @@ async def stream_openai_response(user_message: str):
 
 
 async def main():
+    global engine_proc
+
+    # Launch indexing engine subprocess
+    engine_proc = subprocess.Popen(
+        [sys.executable, "-m", "uvicorn", "code_index_engine.api:app", "--port", str(ENGINE_PORT)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    for _ in range(20):
+        try:
+            await index_client.status()
+            break
+        except Exception:
+            await asyncio.sleep(0.5)
+    try:
+        await index_client.start(str(Path.cwd()))
+    except Exception:
+        pass
+
     # Create a beautiful gradient-style welcome panel
     welcome_text = """[bold bright_blue]🐋 Devstral Engineer[/bold bright_blue] [bright_cyan]with Function Calling[/bright_cyan]
 [dim blue]Powered by Devstral with Chain-of-Thought Reasoning[/dim blue]"""
@@ -1864,6 +1921,7 @@ async def main():
   • [bright_cyan]/help[/bright_cyan] - Show available tools
   • [bright_cyan]/search your query[/bright_cyan] - Inject DuckDuckGo search results
   • [bright_cyan]/deep-research your query[/bright_cyan] - Fetch articles for in-depth research
+  • [bright_cyan]/code-search your query[/bright_cyan] - Search indexed code
   • [bright_cyan]/edit[/bright_cyan] or [bright_cyan]/ask[/bright_cyan] - Switch modes
   • Just ask naturally - the AI will handle file operations automatically!"""
 
@@ -1923,6 +1981,9 @@ async def main():
         if await try_handle_deep_command(user_input):
             continue
 
+        if await try_handle_code_search_command(user_input):
+            continue
+
         if user_input.lower().startswith("/undo"):
             try:
                 num_undos = (
@@ -1971,6 +2032,16 @@ async def main():
     console.print(
         "[bold blue]✨ Session finished. Thank you for using Devstral Engineer![/bold blue]"
     )
+    if engine_proc:
+        try:
+            await index_client.stop()
+        except Exception:
+            pass
+        engine_proc.terminate()
+        try:
+            engine_proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            engine_proc.kill()
     print_profiling_stats()
 
 

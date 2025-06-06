@@ -34,10 +34,11 @@ def start(req: StartRequest):
 
 @app.post("/stop")
 def stop():
-    global watcher
+    global scanner, watcher
     if watcher:
         watcher.stop()
         watcher = None
+    scanner = None
     return {"status": "stopped"}
 
 

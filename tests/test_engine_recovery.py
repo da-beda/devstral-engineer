@@ -40,5 +40,7 @@ def test_engine_restarts_on_crash(tmp_path):
         devstral_eng.status_stop_event.set()
         t.join(timeout=5)
         asyncio.run(devstral_eng.index_client.stop())
+        status = asyncio.run(devstral_eng.index_client.status())
+        assert status["status"] == "not_started"
         devstral_eng.engine_proc.terminate()
         devstral_eng.engine_proc.wait(timeout=5)

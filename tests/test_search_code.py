@@ -31,6 +31,8 @@ def test_search_code_returns_matches(tmp_path):
         assert "foo" in output
     finally:
         asyncio.run(devstral_eng.index_client.stop())
+        status = asyncio.run(devstral_eng.index_client.status())
+        assert status["status"] == "not_started"
         devstral_eng.engine_proc.terminate()
         devstral_eng.engine_proc.wait(timeout=5)
 
@@ -52,5 +54,7 @@ def test_search_code_directory_filter(tmp_path):
         assert str(f2) not in output
     finally:
         asyncio.run(devstral_eng.index_client.stop())
+        status = asyncio.run(devstral_eng.index_client.status())
+        assert status["status"] == "not_started"
         devstral_eng.engine_proc.terminate()
         devstral_eng.engine_proc.wait(timeout=5)

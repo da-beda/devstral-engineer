@@ -21,7 +21,7 @@ async def wait_for_status(client, timeout=10.0):
 
 def test_engine_restarts_on_crash(tmp_path):
     port = 9000 + int(time.time()) % 1000
-    devstral_eng.launch_engine(port)
+    devstral_eng.launch_engine(port, debug=False)
     asyncio.run(wait_for_status(devstral_eng.index_client))
     assert devstral_eng.engine_proc.poll() is None
 

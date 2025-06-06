@@ -60,8 +60,17 @@ status_stop_event = threading.Event()
 status_thread: threading.Thread | None = None
 
 
-def launch_engine(port: int = ENGINE_PORT) -> None:
-    """Start the indexing engine subprocess and initialize it."""
+def launch_engine(port: int = ENGINE_PORT, debug: bool = False) -> None:
+    """Start the indexing engine subprocess and initialize it.
+
+    Parameters
+    ----------
+    port:
+        Port number to bind the engine to.
+    debug:
+        If ``True`` the engine's stdout/stderr will be shown instead of
+        being suppressed.
+    """
     global engine_proc, index_client, ENGINE_PORT
     ENGINE_PORT = port
     index_client = IndexClient(f"http://127.0.0.1:{ENGINE_PORT}")
@@ -75,8 +84,8 @@ def launch_engine(port: int = ENGINE_PORT) -> None:
             "--port",
             str(ENGINE_PORT),
         ],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=None if debug else subprocess.DEVNULL,
+        stderr=None if debug else subprocess.DEVNULL,
     )
     # wait for status endpoint
     for _ in range(20):
@@ -107,7 +116,7 @@ def poll_engine_status() -> None:
             console.log("[yellow]Engine not responding, attempting restart...[/yellow]")
             if engine_proc is None or engine_proc.poll() is not None:
                 try:
-                    launch_engine(ENGINE_PORT)
+                    launch_engine(ENGINE_PORT, debug=VERBOSE or DEBUG)
                 except Exception as exc:  # pragma: no cover - restart failure edge
                     console.log(f"[red]Failed to restart engine: {exc}[/red]")
         status_stop_event.wait(STATUS_POLL_INTERVAL)
@@ -1509,9 +1518,16 @@ def parse_args():
     parser = argparse.ArgumentParser(
         description="Devstral Engineer (conversation history persists between runs)"
     )
-    parser.add_argument("-v", "--verbose", action="store_true", help="verbose output")
     parser.add_argument(
-        "--debug", action="store_true", help="debug output with profiling"
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="verbose output (show engine logs)",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="debug output with profiling and engine logs",
     )
     return parser.parse_args()
 
@@ -2012,7 +2028,7 @@ async def stream_openai_response(user_message: str):
 async def main():
 
     # Launch indexing engine subprocess
-    launch_engine(ENGINE_PORT)
+    launch_engine(ENGINE_PORT, debug=VERBOSE or DEBUG)
     start_status_thread()
 
     # Create a beautiful gradient-style welcome panel

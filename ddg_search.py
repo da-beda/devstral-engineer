@@ -15,7 +15,7 @@ CACHE_TTL_SECONDS = 24 * 60 * 60  # 24 hours
 def _load_cache() -> Dict[str, Dict[str, object]]:
     if CACHE_FILE.exists():
         try:
-            with CACHE_FILE.open("r") as f:
+            with CACHE_FILE.open("r", encoding="utf-8") as f:
                 return json.load(f)
         except Exception:
             return {}
@@ -24,7 +24,7 @@ def _load_cache() -> Dict[str, Dict[str, object]]:
 
 def _save_cache(cache: Dict[str, Dict[str, object]]) -> None:
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    with CACHE_FILE.open("w") as f:
+    with CACHE_FILE.open("w", encoding="utf-8") as f:
         json.dump(cache, f)
 
 

@@ -1,4 +1,5 @@
 import pytest
+import ddg_deep
 from ddg_deep import parse_ddg_results, RESULTS_PER_PAGE
 
 SAMPLE_HTML = """
@@ -109,3 +110,28 @@ async def test_to_markdown_throttles_before_fetch(monkeypatch):
 
     await to_markdown(["u1", "u2"])
     assert calls == ["fetch:u1", f"sleep:{REQUEST_DELAY}", "fetch:u2"]
+
+
+@pytest.mark.asyncio
+async def test_fetch_ddg_page_returns_none_on_error(monkeypatch):
+    class FailResponse:
+        async def __aenter__(self):
+            raise RuntimeError("boom")
+
+        async def __aexit__(self, exc_type, exc, tb):
+            pass
+
+    class FailSession:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc, tb):
+            pass
+
+        def post(self, *args, **kwargs):
+            return FailResponse()
+
+    monkeypatch.setattr(ddg_deep.aiohttp, "ClientSession", lambda *a, **kw: FailSession())
+
+    result = await ddg_deep.fetch_ddg_page("query")
+    assert result is None

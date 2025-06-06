@@ -1,5 +1,3 @@
-import os
-from pathlib import Path
 from config import Config
 
 def test_config_roundtrip(tmp_path):

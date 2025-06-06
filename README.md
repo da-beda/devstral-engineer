@@ -33,6 +33,10 @@ The AI can automatically execute these operations when needed:
 - Batch read multiple files efficiently
 - Formatted output with clear file separators
 
+#### `view(file_path: str, offset: int, limit: int)`
+- Display part of a file starting at `offset` showing up to `limit` lines
+- For very large files a short summary is appended
+
 #### `create_file(file_path: str, content: str)`
 - Create new files or overwrite existing ones
 - Automatic directory creation and safety checks

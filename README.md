@@ -231,6 +231,7 @@ You> Now review this codebase structure
 - **File content preservation** across conversation history
 - **Tool message integration** for complete operation tracking
 - **Persistent history** stored in `~/.config/devstral-engineer/conversation_history.json`
+- **View history** with `devstral history` or clear it using `devstral clear-history`
 
 ### **Batch Operations**
 ```
@@ -314,6 +315,12 @@ uv run -m devstral_cli
 or
 ```bash
 devstral
+```
+
+### History Commands
+```bash
+devstral history        # show saved conversation
+devstral clear-history  # remove saved conversation
 ```
 
 ### Debug Profiling

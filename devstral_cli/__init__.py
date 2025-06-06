@@ -1,10 +1,14 @@
 import typer
 from config import Config, CONFIG_FILE
 from ddg_search import clear_ddg_cache
+from conversation_store import display_history, clear_history
 from .chat import chat
 
 app = typer.Typer(
-    help="Devstral Engineer CLI - conversation history is saved between sessions"
+    help=(
+        "Devstral Engineer CLI - conversation history is saved between sessions."
+        " Use the 'history' command to view or 'clear-history' to delete it."
+    )
 )
 
 
@@ -48,3 +52,16 @@ def clear_cache() -> None:
     """Remove cached DuckDuckGo search results."""
     clear_ddg_cache()
     typer.echo("DuckDuckGo cache cleared.")
+
+
+@app.command("history")
+def view_history() -> None:
+    """Display the stored conversation history."""
+    typer.echo(display_history())
+
+
+@app.command("clear-history")
+def clear_history_cmd() -> None:
+    """Delete the stored conversation history."""
+    clear_history()
+    typer.echo("Conversation history cleared.")

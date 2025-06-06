@@ -59,6 +59,12 @@ The AI can automatically execute these operations when needed:
 - Run a code formatter like black
 #### `summarize_code(file_path: str)`
 - Summarize a large code file for quick context
+#### `git_status()` / `git_diff(path: str)` / `git_log(n: int)` / `git_add(path: str)`
+- Interact with git to inspect and stage changes
+#### `run_build(command: str)`
+- Trigger project build systems
+#### `manage_dependency(action: str, package: str)`
+- Install or uninstall dependencies via pip
 
 ### 📁 **File Operations**
 

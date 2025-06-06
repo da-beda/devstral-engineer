@@ -16,6 +16,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.style import Style
+import questionary
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style as PromptStyle
 import time
@@ -627,6 +628,12 @@ def apply_diff_edit(path: str, original_snippet: str, new_snippet: str):
             lineterm=""
         ))
         console.print(Panel(diff, title=f"Diff for {path}", border_style="green"))
+
+        confirm = questionary.confirm("Apply this diff?", default=False).ask()
+        if not confirm:
+            console.print("[bold yellow]⚠ Diff edit skipped by user[/bold yellow]")
+            return
+
         create_file(path, updated_content)
         console.print(f"[bold blue]✓[/bold blue] Applied diff edit to '[bright_cyan]{path}[/bright_cyan]'")
 

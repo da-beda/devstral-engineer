@@ -49,7 +49,9 @@ async def async_ddg_search(
         data = {"q": query, "kl": region, "kp": "-2"}
         headers = {"User-Agent": "Mozilla/5.0 (Python) DevstralDDG/1.0"}
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=data, headers=headers, timeout=10) as resp:
+            async with session.post(
+                url, data=data, headers=headers, timeout=10
+            ) as resp:
                 resp.raise_for_status()
                 text = await resp.text()
         results = parse_ddg_html(text, max_results)
@@ -58,9 +60,12 @@ async def async_ddg_search(
     return results[:max_results]
 
 
-def ddg_search(query: str, max_results: int = 5, region: str = "us-en") -> List[Dict[str, str]]:
+def ddg_search(
+    query: str, max_results: int = 5, region: str = "us-en"
+) -> List[Dict[str, str]]:
     """Synchronous wrapper for :func:`async_ddg_search`."""
     return asyncio.run(async_ddg_search(query, max_results=max_results, region=region))
+
 
 def parse_ddg_html(html: str, max_results: int) -> List[Dict[str, str]]:
     soup = BeautifulSoup(html, "html.parser")
@@ -73,10 +78,13 @@ def parse_ddg_html(html: str, max_results: int) -> List[Dict[str, str]]:
             continue
         title = a_title.get_text(strip=True)
         url = a_title["href"]
-        snippet_tag = div.find("a", class_="result__snippet") or div.find("p", class_="result__snippet")
+        snippet_tag = div.find("a", class_="result__snippet") or div.find(
+            "p", class_="result__snippet"
+        )
         snippet = snippet_tag.get_text(strip=True) if snippet_tag else ""
         results.append({"title": title, "url": url, "snippet": snippet})
     return results
+
 
 def ddg_results_to_markdown(results: List[Dict[str, str]]) -> str:
     lines = ["### DuckDuckGo Search Results", ""]
@@ -84,8 +92,10 @@ def ddg_results_to_markdown(results: List[Dict[str, str]]) -> str:
         lines.append(f"- [{r['title']}]({r['url']}): {r['snippet']}")
     return "\n".join(lines)
 
+
 if __name__ == "__main__":
     import sys
+
     q = " ".join(sys.argv[1:]) or "python"
     results = asyncio.run(async_ddg_search(q, max_results=3))
     md = ddg_results_to_markdown(results)

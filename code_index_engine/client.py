@@ -10,7 +10,9 @@ class IndexClient:
 
     async def start(self, path: str) -> Any:
         async with aiohttp.ClientSession() as session:
-            async with session.post(f"{self.base_url}/start", json={"path": path}) as resp:
+            async with session.post(
+                f"{self.base_url}/start", json={"path": path}
+            ) as resp:
                 resp.raise_for_status()
                 return await resp.json()
 

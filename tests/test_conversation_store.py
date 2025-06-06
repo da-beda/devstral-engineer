@@ -3,7 +3,6 @@ from conversation_store import (
     save_history,
     display_history,
     clear_history,
-    HISTORY_FILE,
 )
 
 

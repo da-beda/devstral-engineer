@@ -1,14 +1,14 @@
 import pytest
 from ddg_deep import parse_ddg_results, RESULTS_PER_PAGE
 
-SAMPLE_HTML = '''
+SAMPLE_HTML = """
 <div class="result">
   <a class="result__a" href="http://example1.com">One</a>
 </div>
 <div class="result">
   <a class="result__a" href="http://example2.com">Two</a>
 </div>
-'''
+"""
 
 
 def test_parse_ddg_results_extracts_urls():
@@ -36,11 +36,15 @@ def test_parse_ddg_results_respects_limit():
 async def test_to_markdown_formats(monkeypatch):
     async def fake_fetch(url):
         return f"Content from {url}"
+
     monkeypatch.setattr("ddg_deep.fetch_article_text_async", fake_fetch)
+
     async def noop(_):
         pass
+
     monkeypatch.setattr("ddg_deep.asyncio.sleep", noop)
     from ddg_deep import to_markdown
+
     md = await to_markdown(["http://a.com", "http://b.com"])
     assert md.startswith("### Deep Research Articles")
     assert "#### 1. [http://a.com](http://a.com)" in md
@@ -51,29 +55,36 @@ async def test_to_markdown_formats(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_deep_research_aggregates_pages(monkeypatch):
-    PAGE1 = '''
+    PAGE1 = """
     <div class="result"><a class="result__a" href="http://a.com">A</a></div>
     <div class="result"><a class="result__a" href="http://b.com">B</a></div>
     <a class="result--more__btn" href="#">More</a>
-    '''
-    PAGE2 = '''
+    """
+    PAGE2 = """
     <div class="result"><a class="result__a" href="http://b.com">B</a></div>
     <div class="result"><a class="result__a" href="http://c.com">C</a></div>
-    '''
+    """
+
     async def fake_page(query, start=0):
         if start == 0:
             return PAGE1
         elif start == RESULTS_PER_PAGE:
             return PAGE2
         return None
+
     monkeypatch.setattr("ddg_deep.fetch_ddg_page", fake_page)
+
     async def fake_article(url):
         return f"Article for {url}"
+
     monkeypatch.setattr("ddg_deep.fetch_article_text_async", fake_article)
+
     async def noop(_):
         pass
+
     monkeypatch.setattr("ddg_deep.asyncio.sleep", noop)
     from ddg_deep import deep_research
+
     md = await deep_research("test")
     assert md.count("<details>") == 3
     assert "http://a.com" in md

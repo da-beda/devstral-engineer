@@ -6,6 +6,7 @@ os.environ.setdefault("OPENAI_API_KEY", "test")
 
 import devstral_eng
 
+
 async def wait_for_status(client, timeout=10.0):
     start = time.time()
     while time.time() - start < timeout:

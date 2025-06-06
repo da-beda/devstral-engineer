@@ -58,6 +58,10 @@ The AI can automatically execute these operations when needed:
 - Run a code linter like ruff
 #### `formatter(path: str, formatter_command: str)`
 - Run a code formatter like black
+#### `grep(pattern: str, file_path: str, ignore_case: bool)`
+- Search for a regex pattern within a file and return matching lines
+#### `glob(pattern: str, cwd: str)`
+- List files matching a glob pattern
 #### `summarize_code(file_path: str)`
 - Summarize a large code file for quick context
 #### `git_status()` / `git_diff(path: str)` / `git_log(n: int)` / `git_add(path: str)`

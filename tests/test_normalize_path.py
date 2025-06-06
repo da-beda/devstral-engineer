@@ -9,7 +9,8 @@ import pytest
 source = Path(__file__).resolve().parents[1] / "devstral_eng.py"
 mod_ast = ast.parse(source.read_text())
 fn_node = next(
-    n for n in mod_ast.body
+    n
+    for n in mod_ast.body
     if isinstance(n, ast.FunctionDef) and n.name == "normalize_path"
 )
 module = types.ModuleType("_normalize")

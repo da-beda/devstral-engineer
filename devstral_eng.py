@@ -67,7 +67,14 @@ def launch_engine(port: int = ENGINE_PORT) -> None:
     index_client = IndexClient(f"http://127.0.0.1:{ENGINE_PORT}")
     console.log(f"Starting index engine on port {ENGINE_PORT}")
     engine_proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "code_index_engine.api:app", "--port", str(ENGINE_PORT)],
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "code_index_engine.api:app",
+            "--port",
+            str(ENGINE_PORT),
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
@@ -121,6 +128,7 @@ def stop_status_thread() -> None:
     status_stop_event.set()
     if status_thread:
         status_thread.join(timeout=5)
+
 
 # Initialize Rich console and prompt session
 console = Console()
@@ -903,9 +911,7 @@ async def search_code(query: str, directory_prefix: str | None = None) -> str:
         return f"Error performing code search: {e}"
 
     if directory_prefix:
-        results = [
-            r for r in results if str(r["path"]).startswith(directory_prefix)
-        ]
+        results = [r for r in results if str(r["path"]).startswith(directory_prefix)]
 
     if not results:
         return "No matches found"
@@ -1106,7 +1112,7 @@ async def try_handle_code_search_command(user_input: str) -> bool:
     if not user_input.lower().startswith(prefix):
         return False
 
-    query = user_input[len(prefix):].strip()
+    query = user_input[len(prefix) :].strip()
     if not query:
         console.print("[bold yellow]⚠ Usage:[/bold yellow] /code-search <query>")
         return True
@@ -1118,9 +1124,7 @@ async def try_handle_code_search_command(user_input: str) -> bool:
             return True
         lines = [f"[cyan]{r['path']}[/cyan]\n{r['content']}" for r in results]
         content = "\n\n".join(lines)
-        console.print(
-            Panel(content, title="Code Search Results", border_style="green")
-        )
+        console.print(Panel(content, title="Code Search Results", border_style="green"))
         add_to_history(
             {
                 "role": "system",
@@ -1375,6 +1379,7 @@ def ensure_file_in_context(file_path: str) -> bool:
         )
         return False
 
+
 def normalize_path(path_str: str) -> str:
     """
     Return a canonical, absolute version of the path with security checks.
@@ -1399,6 +1404,7 @@ def normalize_path(path_str: str) -> str:
 
     # Now resolve against cwd (and return an absolute path)
     return str(path.resolve())
+
 
 def undo_last_change(num_undos: int = 1):
     """Undo the most recent file creation or edit operations."""
@@ -2061,7 +2067,6 @@ async def main():
             print_help()
             continue
 
-
         if await try_handle_add_command(user_input):
             continue
 
@@ -2110,8 +2115,12 @@ async def main():
                 }
                 result = await execute_function_call_dict(tool_call)
                 console.print(result)
-                add_to_history({"role": "tool", "tool_call_id": tool_call["id"], "content": result})
-            await stream_openai_response(f"Finished executing planned steps for: {request_text}")
+                add_to_history(
+                    {"role": "tool", "tool_call_id": tool_call["id"], "content": result}
+                )
+            await stream_openai_response(
+                f"Finished executing planned steps for: {request_text}"
+            )
             continue
 
         response_data = await stream_openai_response(user_input)

@@ -12,6 +12,7 @@ def _default_client() -> tuple[AsyncOpenAI, str]:
     client = AsyncOpenAI(base_url="https://openrouter.ai/api/v1", api_key=cfg.api_key)
     return client, cfg.default_model
 
+
 async def plan_steps(
     request: str,
     tools: List[Dict[str, Any]],

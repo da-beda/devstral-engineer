@@ -1,5 +1,6 @@
 from config import Config, EmbeddingConfig
 
+
 def test_config_roundtrip(tmp_path):
     cfg = Config(
         api_key="key",
@@ -8,7 +9,7 @@ def test_config_roundtrip(tmp_path):
         index_engine_path="/path/bin",
         qdrant_url="http://localhost:6333",
         qdrant_api_key="qkey",
-        embedding=EmbeddingConfig(provider="openai", model="test", api_key="e")
+        embedding=EmbeddingConfig(provider="openai", model="test", api_key="e"),
     )
     path = tmp_path / "config.yaml"
     cfg.save(path)

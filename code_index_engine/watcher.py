@@ -3,6 +3,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from .scanner import WorkspaceScanner, SUPPORTED_EXTENSIONS, IndexedBlock
 
+
 class _Handler(FileSystemEventHandler):
     def __init__(self, scanner: WorkspaceScanner):
         self.scanner = scanner
@@ -24,11 +25,17 @@ class _Handler(FileSystemEventHandler):
             rel = path.relative_to(self.scanner.root)
             if self.scanner.spec.match_file(str(rel)):
                 return
-            text = path.read_text(errors='ignore')
-            embedding = self.scanner.index[path].embedding if path in self.scanner.index else None
+            text = path.read_text(errors="ignore")
+            embedding = (
+                self.scanner.index[path].embedding
+                if path in self.scanner.index
+                else None
+            )
             if embedding is None or self.scanner.index[path].content != text:
                 from .embeddings import embed_text
+
                 self.scanner.index[path] = IndexedBlock(path, text, embed_text(text))
+
 
 class WorkspaceWatcher:
     def __init__(self, scanner: WorkspaceScanner):

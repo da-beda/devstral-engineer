@@ -2,7 +2,6 @@ import asyncio
 import subprocess
 import sys
 import time
-from pathlib import Path
 from code_index_engine.client import IndexClient
 
 
@@ -22,7 +21,14 @@ def test_engine_process_starts_and_searches(tmp_path):
     file.write_text("def foo(): return 42")
     port = 8123
     proc = subprocess.Popen(
-        [sys.executable, "-m", "uvicorn", "code_index_engine.api:app", "--port", str(port)],
+        [
+            sys.executable,
+            "-m",
+            "uvicorn",
+            "code_index_engine.api:app",
+            "--port",
+            str(port),
+        ],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )

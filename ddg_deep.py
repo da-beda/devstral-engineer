@@ -17,7 +17,9 @@ async def fetch_ddg_page(query: str, start: int = 0) -> Optional[str]:
     headers = {"User-Agent": "Mozilla/5.0 (Python) DevstralDeep/1.0"}
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.post(url, data=data, headers=headers, timeout=10) as resp:
+            async with session.post(
+                url, data=data, headers=headers, timeout=10
+            ) as resp:
                 resp.raise_for_status()
                 return await resp.text()
     except Exception as e:

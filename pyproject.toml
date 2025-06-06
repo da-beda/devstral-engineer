@@ -26,4 +26,9 @@ devstral = "devstral_cli:app"
 dev = [
     "pytest>=8.4.0",
     "pytest-asyncio>=0.23.6",
+    "ruff>=0.4.8",
 ]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88

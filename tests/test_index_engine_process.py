@@ -41,5 +41,7 @@ def test_engine_process_starts_and_searches(tmp_path):
         assert "sample.py" in results[0]["path"]
     finally:
         asyncio.run(client.stop())
+        status = asyncio.run(client.status())
+        assert status["status"] == "not_started"
         proc.terminate()
         proc.wait(timeout=10)

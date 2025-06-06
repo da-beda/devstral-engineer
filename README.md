@@ -115,10 +115,13 @@ For when you want to preload files into conversation context:
    cd devstral-engineer
    ```
 
-2. **Set up environment**:
+2. **Set up configuration**:
    ```bash
-   # Create .env file
-   echo "OPENROUTER_API_KEY=your_api_key_here" > .env
+   mkdir -p ~/.config/devstral-engineer
+   cat > ~/.config/devstral-engineer/config.yaml <<'EOF'
+   api_key: your_api_key_here
+   default_model: mistralai/devstral-small:free
+   EOF
    ```
 
 3. **Install dependencies** (choose one method):
@@ -252,8 +255,8 @@ Based on my analysis of your project, here's a comprehensive refactoring plan...
 
 **API Key Not Found**
 ```bash
-# Make sure .env file exists with your API key
-echo "OPENROUTER_API_KEY=your_key_here" > .env
+# Ensure ~/.config/devstral-engineer/config.yaml contains your key
+cat ~/.config/devstral-engineer/config.yaml
 ```
 
 **Import Errors**

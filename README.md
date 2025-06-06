@@ -129,13 +129,15 @@ For when you want to preload files into conversation context:
    #### Using uv (recommended - faster)
    ```bash
    uv venv
-   uv run devstral-eng.py
+   uv run -m devstral_cli setup  # create config interactively
+   uv run -m devstral_cli        # start chatting
    ```
 
    #### Using pip
    ```bash
    pip install -r requirements.txt
-   python3 devstral-eng.py
+   devstral setup  # one-time configuration
+   devstral        # start the chat
    ```
 
 ### Usage Examples
@@ -283,12 +285,12 @@ uv sync
 
 ### **Run**
 ```bash
-# Run the application (preferred)
-uv run devstral-eng.py
+# Preferred way using uv
+uv run -m devstral_cli
 ```
 or
 ```bash
-python3 devstral-eng.py
+devstral
 ```
 
 ## License

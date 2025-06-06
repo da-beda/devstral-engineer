@@ -551,6 +551,24 @@ tools = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "search_code",
+            "description": "Search indexed code for a query",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string", "description": "Search query"},
+                    "directory_prefix": {
+                        "type": "string",
+                        "description": "Limit results to this directory",
+                    },
+                },
+                "required": ["query"],
+            },
+        },
+    },
 ]
 
 # --------------------------------------------------------------------------------
@@ -585,6 +603,7 @@ system_PROMPT = dedent(
        - git_status/git_diff/git_log/git_add: Interact with git
        - run_build: Trigger build systems
        - manage_dependency: Install or uninstall packages
+       - search_code: Search indexed code
 
     Guidelines:
     1. Provide natural, conversational responses explaining your reasoning
@@ -875,6 +894,25 @@ def manage_dependency(action: str, package: str) -> str:
         return "Error: action must be 'install' or 'uninstall'"
     cmd = f"pip {action} {shlex.quote(package)}"
     return run_bash(cmd)
+
+
+async def search_code(query: str, directory_prefix: str | None = None) -> str:
+    """Search indexed code using the local index engine."""
+    try:
+        results = await index_client.search(query)
+    except Exception as e:
+        return f"Error performing code search: {e}"
+
+    if directory_prefix:
+        results = [
+            r for r in results if str(r["path"]).startswith(directory_prefix)
+        ]
+
+    if not results:
+        return "No matches found"
+
+    lines = [f"{r['path']}\n{r['content']}" for r in results]
+    return "\n\n".join(lines)
 
 
 def show_diff_table(files_to_edit: List[FileToEdit]) -> None:
@@ -1623,6 +1661,11 @@ async def execute_function_call_dict(tool_call_dict) -> str:
             package = arguments["package"]
             return manage_dependency(action, package)
 
+        elif function_name == "search_code":
+            query = arguments["query"]
+            prefix = arguments.get("directory_prefix")
+            return await search_code(query, prefix)
+
         else:
             return f"Unknown function: {function_name}"
 
@@ -1685,6 +1728,11 @@ async def execute_function_call(tool_call) -> str:
 
             apply_diff_edit(file_path, original_snippet, new_snippet)
             return f"Successfully edited file '{file_path}'"
+
+        elif function_name == "search_code":
+            query = arguments["query"]
+            prefix = arguments.get("directory_prefix")
+            return await search_code(query, prefix)
 
         else:
             return f"Unknown function: {function_name}"

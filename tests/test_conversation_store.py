@@ -1,3 +1,5 @@
+import logging
+
 from conversation_store import (
     load_history,
     save_history,
@@ -30,3 +32,14 @@ def test_display_and_clear(tmp_path, monkeypatch):
     assert "assistant" in text
     clear_history()
     assert not file.exists()
+
+
+def test_corrupt_file_logs_warning(tmp_path, monkeypatch, caplog):
+    file = tmp_path / "hist.json"
+    file.write_text("{ bad json")
+    monkeypatch.setattr("conversation_store.HISTORY_FILE", file)
+    with caplog.at_level(logging.WARNING):
+        assert load_history() == []
+    assert any(
+        "Failed to parse conversation history" in rec.message for rec in caplog.records
+    )

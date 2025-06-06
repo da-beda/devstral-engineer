@@ -1,7 +1,10 @@
 import json
+import logging
 from typing import List, Dict, Any
 
 from config import CONFIG_DIR
+
+logger = logging.getLogger(__name__)
 
 HISTORY_FILE = CONFIG_DIR / "conversation_history.json"
 
@@ -12,10 +15,11 @@ def load_history() -> List[Dict[str, Any]]:
         try:
             with HISTORY_FILE.open("r", encoding="utf-8") as f:
                 data = json.load(f)
-                if isinstance(data, list):
-                    return data
-        except Exception:
-            pass
+            if isinstance(data, list):
+                return data
+            logger.warning("Conversation history is not a list")
+        except Exception as exc:
+            logger.warning("Failed to parse conversation history: %s", exc)
     return []
 
 

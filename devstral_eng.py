@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from textwrap import dedent
 from typing import List, Dict, Any, Optional, Tuple
+import re
 import subprocess
 import shlex
 from openai import OpenAI
@@ -25,6 +26,7 @@ import difflib
 
 # DuckDuckGo helper for on-demand web search
 from ddg_search import ddg_search, ddg_results_to_markdown
+
 # Deep research helper for multi-page scraping
 from ddg_deep import deep_research
 
@@ -45,11 +47,13 @@ MODE = "ask"
 # Initialize Rich console and prompt session
 console = Console()
 prompt_session = PromptSession(
-    style=PromptStyle.from_dict({
-        'prompt': '#0066ff bold',  # Bright blue prompt
-        'completion-menu.completion': 'bg:#1e3a8a fg:#ffffff',
-        'completion-menu.completion.current': 'bg:#3b82f6 fg:#ffffff bold',
-    })
+    style=PromptStyle.from_dict(
+        {
+            "prompt": "#0066ff bold",  # Bright blue prompt
+            "completion-menu.completion": "bg:#1e3a8a fg:#ffffff",
+            "completion-menu.completion.current": "bg:#3b82f6 fg:#ffffff bold",
+        }
+    )
 )
 
 # --------------------------------------------------------------------------------
@@ -63,6 +67,7 @@ client = OpenAI(
 )
 DEFAULT_MODEL = cfg.default_model
 
+
 # --------------------------------------------------------------------------------
 # 2. Define our schema using Pydantic for type safety
 # --------------------------------------------------------------------------------
@@ -70,10 +75,12 @@ class FileToCreate(BaseModel):
     path: str
     content: str
 
+
 class FileToEdit(BaseModel):
     path: str
     original_snippet: str
     new_snippet: str
+
 
 # Remove AssistantResponse as we're using function calling now
 
@@ -94,9 +101,9 @@ tools = [
                         "description": "The path to the file to read (relative or absolute)",
                     }
                 },
-                "required": ["file_path"]
+                "required": ["file_path"],
             },
-        }
+        },
     },
     {
         "type": "function",
@@ -112,9 +119,9 @@ tools = [
                         "description": "Array of file paths to read (relative or absolute)",
                     }
                 },
-                "required": ["file_paths"]
+                "required": ["file_paths"],
             },
-        }
+        },
     },
     {
         "type": "function",
@@ -131,11 +138,11 @@ tools = [
                     "content": {
                         "type": "string",
                         "description": "The content to write to the file",
-                    }
+                    },
                 },
-                "required": ["file_path", "content"]
+                "required": ["file_path", "content"],
             },
-        }
+        },
     },
     {
         "type": "function",
@@ -151,16 +158,16 @@ tools = [
                             "type": "object",
                             "properties": {
                                 "path": {"type": "string"},
-                                "content": {"type": "string"}
+                                "content": {"type": "string"},
                             },
-                            "required": ["path", "content"]
+                            "required": ["path", "content"],
                         },
                         "description": "Array of files to create with their paths and content",
                     }
                 },
-                "required": ["files"]
+                "required": ["files"],
             },
-        }
+        },
     },
     {
         "type": "function",
@@ -181,13 +188,12 @@ tools = [
                     "new_snippet": {
                         "type": "string",
                         "description": "The new text to replace the original snippet with",
-                    }
+                    },
                 },
-                "required": ["file_path", "original_snippet", "new_snippet"]
+                "required": ["file_path", "original_snippet", "new_snippet"],
             },
-        }
-    }
-    ,
+        },
+    },
     {
         "type": "function",
         "function": {
@@ -195,10 +201,12 @@ tools = [
             "description": "List contents of a directory (ls -lA)",
             "parameters": {
                 "type": "object",
-                "properties": {"path": {"type": "string", "description": "Directory path"}},
-                "required": []
-            }
-        }
+                "properties": {
+                    "path": {"type": "string", "description": "Directory path"}
+                },
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -207,10 +215,12 @@ tools = [
             "description": "Create a new directory recursively",
             "parameters": {
                 "type": "object",
-                "properties": {"dir_path": {"type": "string", "description": "Directory to create"}},
-                "required": ["dir_path"]
-            }
-        }
+                "properties": {
+                    "dir_path": {"type": "string", "description": "Directory to create"}
+                },
+                "required": ["dir_path"],
+            },
+        },
     },
     {
         "type": "function",
@@ -221,11 +231,15 @@ tools = [
                 "type": "object",
                 "properties": {
                     "command": {"type": "string", "description": "Command to run"},
-                    "timeout_ms": {"type": "integer", "description": "Timeout in ms", "default": 30000}
+                    "timeout_ms": {
+                        "type": "integer",
+                        "description": "Timeout in ms",
+                        "default": 30000,
+                    },
                 },
-                "required": ["command"]
-            }
-        }
+                "required": ["command"],
+            },
+        },
     },
     {
         "type": "function",
@@ -236,11 +250,11 @@ tools = [
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Target path"},
-                    "depth": {"type": "integer", "description": "Depth limit"}
+                    "depth": {"type": "integer", "description": "Depth limit"},
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -250,12 +264,15 @@ tools = [
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "test_path": {"type": "string", "description": "Specific test path"},
-                    "options": {"type": "string", "description": "Additional options"}
+                    "test_path": {
+                        "type": "string",
+                        "description": "Specific test path",
+                    },
+                    "options": {"type": "string", "description": "Additional options"},
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -266,11 +283,15 @@ tools = [
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Target path"},
-                    "linter_command": {"type": "string", "description": "Command to run", "default": "ruff check"}
+                    "linter_command": {
+                        "type": "string",
+                        "description": "Command to run",
+                        "default": "ruff check",
+                    },
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -281,11 +302,54 @@ tools = [
                 "type": "object",
                 "properties": {
                     "path": {"type": "string", "description": "Target path"},
-                    "formatter_command": {"type": "string", "description": "Formatter command", "default": "black"}
+                    "formatter_command": {
+                        "type": "string",
+                        "description": "Formatter command",
+                        "default": "black",
+                    },
                 },
-                "required": []
-            }
-        }
+                "required": [],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "grep",
+            "description": "Search for a pattern within a file",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Regex pattern"},
+                    "file_path": {"type": "string", "description": "File to search"},
+                    "ignore_case": {
+                        "type": "boolean",
+                        "description": "Case-insensitive search",
+                        "default": False,
+                    },
+                },
+                "required": ["pattern", "file_path"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "glob",
+            "description": "List files matching a glob pattern",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "pattern": {"type": "string", "description": "Glob pattern"},
+                    "cwd": {
+                        "type": "string",
+                        "description": "Search directory",
+                        "default": ".",
+                    },
+                },
+                "required": ["pattern"],
+            },
+        },
     },
     {
         "type": "function",
@@ -297,17 +361,17 @@ tools = [
                 "properties": {
                     "file_path": {"type": "string", "description": "File to summarize"}
                 },
-                "required": ["file_path"]
-            }
-        }
+                "required": ["file_path"],
+            },
+        },
     },
     {
         "type": "function",
         "function": {
             "name": "git_status",
             "description": "View git status",
-            "parameters": {"type": "object", "properties": {}, "required": []}
-        }
+            "parameters": {"type": "object", "properties": {}, "required": []},
+        },
     },
     {
         "type": "function",
@@ -316,10 +380,12 @@ tools = [
             "description": "View git diff",
             "parameters": {
                 "type": "object",
-                "properties": {"path": {"type": "string", "description": "Optional path"}},
-                "required": []
-            }
-        }
+                "properties": {
+                    "path": {"type": "string", "description": "Optional path"}
+                },
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -328,10 +394,16 @@ tools = [
             "description": "View git commit history",
             "parameters": {
                 "type": "object",
-                "properties": {"n": {"type": "integer", "description": "Number of commits", "default": 5}},
-                "required": []
-            }
-        }
+                "properties": {
+                    "n": {
+                        "type": "integer",
+                        "description": "Number of commits",
+                        "default": 5,
+                    }
+                },
+                "required": [],
+            },
+        },
     },
     {
         "type": "function",
@@ -340,10 +412,12 @@ tools = [
             "description": "Stage a file with git add",
             "parameters": {
                 "type": "object",
-                "properties": {"path": {"type": "string", "description": "File to stage"}},
-                "required": ["path"]
-            }
-        }
+                "properties": {
+                    "path": {"type": "string", "description": "File to stage"}
+                },
+                "required": ["path"],
+            },
+        },
     },
     {
         "type": "function",
@@ -352,10 +426,12 @@ tools = [
             "description": "Run a build command like make or npm run build",
             "parameters": {
                 "type": "object",
-                "properties": {"command": {"type": "string", "description": "Build command"}},
-                "required": ["command"]
-            }
-        }
+                "properties": {
+                    "command": {"type": "string", "description": "Build command"}
+                },
+                "required": ["command"],
+            },
+        },
     },
     {
         "type": "function",
@@ -366,18 +442,19 @@ tools = [
                 "type": "object",
                 "properties": {
                     "action": {"type": "string", "description": "install or uninstall"},
-                    "package": {"type": "string", "description": "Package name"}
+                    "package": {"type": "string", "description": "Package name"},
                 },
-                "required": ["action", "package"]
-            }
-        }
-    }
+                "required": ["action", "package"],
+            },
+        },
+    },
 ]
 
 # --------------------------------------------------------------------------------
 # 3. system prompt
 # --------------------------------------------------------------------------------
-system_PROMPT = dedent("""\
+system_PROMPT = dedent(
+    """\
     You are an elite software engineer called Devstral Engineer with decades of experience across all programming domains.
     Your expertise spans system design, algorithms, testing, and best practices.
     You provide thoughtful, well-structured solutions while explaining your reasoning.
@@ -420,33 +497,36 @@ system_PROMPT = dedent("""\
     IMPORTANT: In your thinking process, if you realize that something requires a tool call, cut your thinking short and proceed directly to the tool call. Don't overthink - act efficiently when file operations are needed.
 
     Remember: You're a senior engineer - be thoughtful, precise, and explain your reasoning clearly.
-""")
+"""
+)
 
 # --------------------------------------------------------------------------------
-# 4. Helper functions 
+# 4. Helper functions
 # --------------------------------------------------------------------------------
 
 
 file_history: List[Tuple[str, str, Optional[str]]] = []
+
 
 def read_local_file(file_path: str) -> str:
     """Return the text content of a local file."""
     with open(file_path, "r", encoding="utf-8") as f:
         return f.read()
 
+
 def create_file(path: str, content: str):
     """Create (or overwrite) a file at 'path' with the given 'content'."""
     file_path = Path(path)
-    
+
     # Security checks
-    if any(part.startswith('~') for part in file_path.parts):
+    if any(part.startswith("~") for part in file_path.parts):
         raise ValueError("Home directory references not allowed")
     normalized_path = normalize_path(str(file_path))
-    
+
     # Validate reasonable file size for operations
     if len(content) > 5_000_000:  # 5MB limit
         raise ValueError("File content exceeds 5MB size limit")
-    
+
     file_path.parent.mkdir(parents=True, exist_ok=True)
 
     if file_path.exists():
@@ -458,7 +538,10 @@ def create_file(path: str, content: str):
 
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(content)
-    console.print(f"[bold blue]✓[/bold blue] Created/updated file at '[bright_cyan]{file_path}[/bright_cyan]'")
+    console.print(
+        f"[bold blue]✓[/bold blue] Created/updated file at '[bright_cyan]{file_path}[/bright_cyan]'"
+    )
+
 
 def create_directory(dir_path: str) -> str:
     """Create a new directory recursively."""
@@ -467,6 +550,7 @@ def create_directory(dir_path: str) -> str:
         return f"Successfully created directory: {dir_path}"
     except Exception as e:
         return f"Error creating directory: {e}"
+
 
 def list_directory(path: str = ".") -> str:
     """List directory contents using ls -lA."""
@@ -482,14 +566,21 @@ def list_directory(path: str = ".") -> str:
     except Exception as e:
         return f"Error listing directory: {e}"
 
+
 def run_bash(command: str, timeout_ms: int = 30000) -> str:
     """Run a bash command with basic safety."""
     banned = ["curl", "wget", "nc", "netcat", "telnet", "ssh"]
     if any(b in command.split() for b in banned):
         return "Error: command contains banned subcommand"
     try:
-        proc = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        stdout, stderr = proc.communicate(timeout=timeout_ms/1000)
+        proc = subprocess.Popen(
+            command,
+            shell=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        stdout, stderr = proc.communicate(timeout=timeout_ms / 1000)
         if proc.returncode == 0:
             return stdout.strip()
         return f"Command exited with {proc.returncode}\n{stderr}"
@@ -498,6 +589,7 @@ def run_bash(command: str, timeout_ms: int = 30000) -> str:
         return "Error: command timed out"
     except Exception as e:
         return f"Error executing command: {e}"
+
 
 def tree_view(path: str = ".", depth: int = 2) -> str:
     """Generate a simple directory tree."""
@@ -516,6 +608,7 @@ def tree_view(path: str = ".", depth: int = 2) -> str:
         return "\n".join(lines[:200]) + f"\n... ({len(lines)-200} more lines)"
     return "\n".join(lines)
 
+
 def _run_quality_command(cmd: list[str], name: str) -> str:
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True)
@@ -527,6 +620,7 @@ def _run_quality_command(cmd: list[str], name: str) -> str:
     except Exception as e:
         return f"Error running {name}: {e}"
 
+
 def run_tests(test_path: str | None = None, options: str | None = None) -> str:
     cmd = ["pytest"]
     if options:
@@ -535,13 +629,61 @@ def run_tests(test_path: str | None = None, options: str | None = None) -> str:
         cmd.append(test_path)
     return _run_quality_command(cmd, "pytest")
 
+
 def linter_checker(path: str = ".", linter_command: str = "ruff check") -> str:
     cmd = shlex.split(linter_command) + [path]
     return _run_quality_command(cmd, "linter")
 
+
 def formatter(path: str = ".", formatter_command: str = "black") -> str:
     cmd = shlex.split(formatter_command) + [path]
     return _run_quality_command(cmd, "formatter")
+
+
+def grep(pattern: str, file_path: str, ignore_case: bool = False) -> str:
+    """Return lines matching pattern in file with line numbers."""
+    try:
+        normalized_path = normalize_path(file_path)
+        if is_binary_file(normalized_path):
+            return "Error: target appears to be a binary file"
+        with open(normalized_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+    except Exception as e:
+        return f"Error reading file: {e}"
+
+    try:
+        flags = re.IGNORECASE if ignore_case else 0
+        regex = re.compile(pattern, flags)
+    except re.error as e:
+        return f"Invalid regex pattern: {e}"
+
+    matches = []
+    for i, line in enumerate(lines, 1):
+        if regex.search(line):
+            matches.append(f"{i}:{line.rstrip()}")
+            if len(matches) >= 200:
+                break
+    if not matches:
+        return "No matches found"
+    if len(matches) >= 200:
+        return "\n".join(matches[:200]) + f"\n... ({len(matches)-200} more matches)"
+    return "\n".join(matches)
+
+
+def glob(pattern: str, cwd: str = ".") -> str:
+    """Return files matching a glob pattern relative to cwd."""
+    try:
+        base = Path(normalize_path(cwd))
+        matches = [str(p) for p in base.glob(pattern)]
+        matches.sort()
+    except Exception as e:
+        return f"Error running glob: {e}"
+    if not matches:
+        return "No matches found"
+    if len(matches) > 200:
+        return "\n".join(matches[:200]) + f"\n... ({len(matches)-200} more)"
+    return "\n".join(matches)
+
 
 def summarize_code(file_path: str) -> str:
     """Summarize a code file using the model. Large files are truncated based on token count."""
@@ -567,8 +709,10 @@ def summarize_code(file_path: str) -> str:
     except Exception as e:
         return f"Error summarizing code: {e}"
 
+
 def git_status() -> str:
     return run_bash("git status --short")
+
 
 def git_diff(path: str | None = None) -> str:
     cmd = "git diff"
@@ -576,14 +720,18 @@ def git_diff(path: str | None = None) -> str:
         cmd += f" {shlex.quote(path)}"
     return run_bash(cmd)
 
+
 def git_log(n: int = 5) -> str:
     return run_bash(f"git log -n {n} --oneline")
+
 
 def git_add(path: str) -> str:
     return run_bash(f"git add {shlex.quote(path)}")
 
+
 def run_build(command: str) -> str:
     return run_bash(command)
+
 
 def manage_dependency(action: str, package: str) -> str:
     if action not in {"install", "uninstall"}:
@@ -591,42 +739,56 @@ def manage_dependency(action: str, package: str) -> str:
     cmd = f"pip {action} {shlex.quote(package)}"
     return run_bash(cmd)
 
+
 def show_diff_table(files_to_edit: List[FileToEdit]) -> None:
     if not files_to_edit:
         return
-    
-    table = Table(title="📝 Proposed Edits", show_header=True, header_style="bold bright_blue", show_lines=True, border_style="blue")
+
+    table = Table(
+        title="📝 Proposed Edits",
+        show_header=True,
+        header_style="bold bright_blue",
+        show_lines=True,
+        border_style="blue",
+    )
     table.add_column("File Path", style="bright_cyan", no_wrap=True)
     table.add_column("Original", style="red dim")
     table.add_column("New", style="bright_green")
 
     for edit in files_to_edit:
         table.add_row(edit.path, edit.original_snippet, edit.new_snippet)
-    
+
     console.print(table)
+
 
 def apply_diff_edit(path: str, original_snippet: str, new_snippet: str):
     """Reads the file at 'path', replaces the first occurrence of 'original_snippet' with 'new_snippet', then overwrites."""
     try:
         content = read_local_file(path)
-        
+
         # Verify we're replacing the exact intended occurrence
         occurrences = content.count(original_snippet)
         if occurrences == 0:
             raise ValueError("Original snippet not found")
         if occurrences > 1:
-            console.print(f"[bold yellow]⚠ Multiple matches ({occurrences}) found - requiring line numbers for safety[/bold yellow]")
-            console.print("[dim]Use format:\n--- original.py (lines X-Y)\n+++ modified.py[/dim]")
+            console.print(
+                f"[bold yellow]⚠ Multiple matches ({occurrences}) found - requiring line numbers for safety[/bold yellow]"
+            )
+            console.print(
+                "[dim]Use format:\n--- original.py (lines X-Y)\n+++ modified.py[/dim]"
+            )
             raise ValueError(f"Ambiguous edit: {occurrences} matches")
-        
+
         updated_content = content.replace(original_snippet, new_snippet, 1)
-        diff = "\n".join(difflib.unified_diff(
-            content.splitlines(),
-            updated_content.splitlines(),
-            fromfile="before",
-            tofile="after",
-            lineterm=""
-        ))
+        diff = "\n".join(
+            difflib.unified_diff(
+                content.splitlines(),
+                updated_content.splitlines(),
+                fromfile="before",
+                tofile="after",
+                lineterm="",
+            )
+        )
         console.print(Panel(diff, title=f"Diff for {path}", border_style="green"))
 
         confirm = questionary.confirm("Apply this diff?", default=False).ask()
@@ -635,21 +797,37 @@ def apply_diff_edit(path: str, original_snippet: str, new_snippet: str):
             return
 
         create_file(path, updated_content)
-        console.print(f"[bold blue]✓[/bold blue] Applied diff edit to '[bright_cyan]{path}[/bright_cyan]'")
+        console.print(
+            f"[bold blue]✓[/bold blue] Applied diff edit to '[bright_cyan]{path}[/bright_cyan]'"
+        )
 
     except FileNotFoundError:
-        console.print(f"[bold red]✗[/bold red] File not found for diff editing: '[bright_cyan]{path}[/bright_cyan]'")
+        console.print(
+            f"[bold red]✗[/bold red] File not found for diff editing: '[bright_cyan]{path}[/bright_cyan]'"
+        )
     except ValueError as e:
-        console.print(f"[bold yellow]⚠[/bold yellow] {str(e)} in '[bright_cyan]{path}[/bright_cyan]'. No changes made.")
+        console.print(
+            f"[bold yellow]⚠[/bold yellow] {str(e)} in '[bright_cyan]{path}[/bright_cyan]'. No changes made."
+        )
         console.print("\n[bold blue]Expected snippet:[/bold blue]")
-        console.print(Panel(original_snippet, title="Expected", border_style="blue", title_align="left"))
+        console.print(
+            Panel(
+                original_snippet,
+                title="Expected",
+                border_style="blue",
+                title_align="left",
+            )
+        )
         console.print("\n[bold blue]Actual file content:[/bold blue]")
-        console.print(Panel(content, title="Actual", border_style="yellow", title_align="left"))
+        console.print(
+            Panel(content, title="Actual", border_style="yellow", title_align="left")
+        )
+
 
 def try_handle_add_command(user_input: str) -> bool:
     prefix = "/add "
     if user_input.strip().lower().startswith(prefix):
-        path_to_add = user_input[len(prefix):].strip()
+        path_to_add = user_input[len(prefix) :].strip()
         try:
             normalized_path = normalize_path(path_to_add)
             if os.path.isdir(normalized_path):
@@ -658,13 +836,19 @@ def try_handle_add_command(user_input: str) -> bool:
             else:
                 # Handle a single file as before
                 content = read_local_file(normalized_path)
-                conversation_history.append({
-                    "role": "system",
-                    "content": f"Content of file '{normalized_path}':\n\n{content}"
-                })
-                console.print(f"[bold blue]✓[/bold blue] Added file '[bright_cyan]{normalized_path}[/bright_cyan]' to conversation.\n")
+                conversation_history.append(
+                    {
+                        "role": "system",
+                        "content": f"Content of file '{normalized_path}':\n\n{content}",
+                    }
+                )
+                console.print(
+                    f"[bold blue]✓[/bold blue] Added file '[bright_cyan]{normalized_path}[/bright_cyan]' to conversation.\n"
+                )
         except OSError as e:
-            console.print(f"[bold red]✗[/bold red] Could not add path '[bright_cyan]{path_to_add}[/bright_cyan]': {e}\n")
+            console.print(
+                f"[bold red]✗[/bold red] Could not add path '[bright_cyan]{path_to_add}[/bright_cyan]': {e}\n"
+            )
         return True
     return False
 
@@ -675,7 +859,7 @@ def try_handle_search_command(user_input: str) -> bool:
     if not user_input.lower().startswith(prefix):
         return False
 
-    query = user_input[len(prefix):].strip()
+    query = user_input[len(prefix) :].strip()
     if not query:
         console.print("[bold yellow]⚠ Usage:[/bold yellow] /search <your query>")
         return True
@@ -685,10 +869,12 @@ def try_handle_search_command(user_input: str) -> bool:
         results = ddg_search(query, max_results=5)
         if not results:
             console.print("[bold yellow]⚠ No results found.[/bold yellow]")
-            conversation_history.append({
-                "role": "system",
-                "content": f"Search for '{query}' returned no results."
-            })
+            conversation_history.append(
+                {
+                    "role": "system",
+                    "content": f"Search for '{query}' returned no results.",
+                }
+            )
             return True
 
         md = ddg_results_to_markdown(results)
@@ -696,10 +882,12 @@ def try_handle_search_command(user_input: str) -> bool:
         console.print(Panel(md, title="Search Results (Markdown)", border_style="cyan"))
     except Exception as e:
         console.print(f"[bold red]✗ DuckDuckGo search failed:[/bold red] {e}")
-        conversation_history.append({
-            "role": "system",
-            "content": f"Error performing DuckDuckGo search for '{query}': {e}"
-        })
+        conversation_history.append(
+            {
+                "role": "system",
+                "content": f"Error performing DuckDuckGo search for '{query}': {e}",
+            }
+        )
     return True
 
 
@@ -709,62 +897,155 @@ def try_handle_deep_command(user_input: str) -> bool:
     if not user_input.lower().startswith(prefix):
         return False
 
-    query_terms = user_input[len(prefix):].strip()
+    query_terms = user_input[len(prefix) :].strip()
     if not query_terms:
         console.print("[bold yellow]⚠ Usage:[/bold yellow] /deep-research <your query>")
         return True
 
-    console.print(f"[bold blue]🔎 Starting Deep Research for:[/bold blue] '{query_terms}'")
+    console.print(
+        f"[bold blue]🔎 Starting Deep Research for:[/bold blue] '{query_terms}'"
+    )
     try:
         md_content = deep_research(query_terms)
         conversation_history.append({"role": "system", "content": md_content})
-        console.print(Panel(md_content, title="Deep Research Results (Markdown)", border_style="magenta"))
+        console.print(
+            Panel(
+                md_content,
+                title="Deep Research Results (Markdown)",
+                border_style="magenta",
+            )
+        )
     except Exception as e:
         console.print(f"[bold red]✗ Deep research failed:[/bold red] {e}")
-        conversation_history.append({"role": "system", "content": f"Error during deep research for '{query_terms}': {e}"})
+        conversation_history.append(
+            {
+                "role": "system",
+                "content": f"Error during deep research for '{query_terms}': {e}",
+            }
+        )
     return True
 
+
 def add_directory_to_conversation(directory_path: str):
-    with console.status("[bold bright_blue]🔍 Scanning directory...[/bold bright_blue]") as status:
+    with console.status(
+        "[bold bright_blue]🔍 Scanning directory...[/bold bright_blue]"
+    ) as status:
         excluded_files = {
             # Python specific
-            ".DS_Store", "Thumbs.db", ".gitignore", ".python-version",
-            "uv.lock", ".uv", "uvenv", ".uvenv", ".venv", "venv",
-            "__pycache__", ".pytest_cache", ".coverage", ".mypy_cache",
+            ".DS_Store",
+            "Thumbs.db",
+            ".gitignore",
+            ".python-version",
+            "uv.lock",
+            ".uv",
+            "uvenv",
+            ".uvenv",
+            ".venv",
+            "venv",
+            "__pycache__",
+            ".pytest_cache",
+            ".coverage",
+            ".mypy_cache",
             # Node.js / Web specific
-            "node_modules", "package-lock.json", "yarn.lock", "pnpm-lock.yaml",
-            ".next", ".nuxt", "dist", "build", ".cache", ".parcel-cache",
-            ".turbo", ".vercel", ".output", ".contentlayer",
+            "node_modules",
+            "package-lock.json",
+            "yarn.lock",
+            "pnpm-lock.yaml",
+            ".next",
+            ".nuxt",
+            "dist",
+            "build",
+            ".cache",
+            ".parcel-cache",
+            ".turbo",
+            ".vercel",
+            ".output",
+            ".contentlayer",
             # Build outputs
-            "out", "coverage", ".nyc_output", "storybook-static",
+            "out",
+            "coverage",
+            ".nyc_output",
+            "storybook-static",
             # Environment and config
-            ".env", ".env.local", ".env.development", ".env.production",
+            ".env",
+            ".env.local",
+            ".env.development",
+            ".env.production",
             # Misc
-            ".git", ".svn", ".hg", "CVS"
+            ".git",
+            ".svn",
+            ".hg",
+            "CVS",
         }
         excluded_extensions = {
             # Binary and media files
-            ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".webp", ".avif",
-            ".mp4", ".webm", ".mov", ".mp3", ".wav", ".ogg",
-            ".zip", ".tar", ".gz", ".7z", ".rar",
-            ".exe", ".dll", ".so", ".dylib", ".bin",
+            ".png",
+            ".jpg",
+            ".jpeg",
+            ".gif",
+            ".ico",
+            ".svg",
+            ".webp",
+            ".avif",
+            ".mp4",
+            ".webm",
+            ".mov",
+            ".mp3",
+            ".wav",
+            ".ogg",
+            ".zip",
+            ".tar",
+            ".gz",
+            ".7z",
+            ".rar",
+            ".exe",
+            ".dll",
+            ".so",
+            ".dylib",
+            ".bin",
             # Documents
-            ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx",
+            ".pdf",
+            ".doc",
+            ".docx",
+            ".xls",
+            ".xlsx",
+            ".ppt",
+            ".pptx",
             # Python specific
-            ".pyc", ".pyo", ".pyd", ".egg", ".whl",
+            ".pyc",
+            ".pyo",
+            ".pyd",
+            ".egg",
+            ".whl",
             # UV specific
-            ".uv", ".uvenv",
+            ".uv",
+            ".uvenv",
             # Database and logs
-            ".db", ".sqlite", ".sqlite3", ".log",
+            ".db",
+            ".sqlite",
+            ".sqlite3",
+            ".log",
             # IDE specific
-            ".idea", ".vscode",
+            ".idea",
+            ".vscode",
             # Web specific
-            ".map", ".chunk.js", ".chunk.css",
-            ".min.js", ".min.css", ".bundle.js", ".bundle.css",
+            ".map",
+            ".chunk.js",
+            ".chunk.css",
+            ".min.js",
+            ".min.css",
+            ".bundle.js",
+            ".bundle.css",
             # Cache and temp files
-            ".cache", ".tmp", ".temp",
+            ".cache",
+            ".tmp",
+            ".temp",
             # Font files
-            ".ttf", ".otf", ".woff", ".woff2", ".eot"
+            ".ttf",
+            ".otf",
+            ".woff",
+            ".woff2",
+            ".eot",
         }
         skipped_files = []
         added_files = []
@@ -774,18 +1055,22 @@ def add_directory_to_conversation(directory_path: str):
 
         for root, dirs, files in os.walk(directory_path):
             if total_files_processed >= max_files:
-                console.print(f"[bold yellow]⚠[/bold yellow] Reached maximum file limit ({max_files})")
+                console.print(
+                    f"[bold yellow]⚠[/bold yellow] Reached maximum file limit ({max_files})"
+                )
                 break
 
             status.update(f"[bold bright_blue]🔍 Scanning {root}...[/bold bright_blue]")
             # Skip hidden directories and excluded directories
-            dirs[:] = [d for d in dirs if not d.startswith('.') and d not in excluded_files]
+            dirs[:] = [
+                d for d in dirs if not d.startswith(".") and d not in excluded_files
+            ]
 
             for file in files:
                 if total_files_processed >= max_files:
                     break
 
-                if file.startswith('.') or file in excluded_files:
+                if file.startswith(".") or file in excluded_files:
                     skipped_files.append(os.path.join(root, file))
                     continue
 
@@ -809,40 +1094,50 @@ def add_directory_to_conversation(directory_path: str):
 
                     normalized_path = normalize_path(full_path)
                     content = read_local_file(normalized_path)
-                    conversation_history.append({
-                        "role": "system",
-                        "content": f"Content of file '{normalized_path}':\n\n{content}"
-                    })
+                    conversation_history.append(
+                        {
+                            "role": "system",
+                            "content": f"Content of file '{normalized_path}':\n\n{content}",
+                        }
+                    )
                     added_files.append(normalized_path)
                     total_files_processed += 1
 
                 except OSError:
                     skipped_files.append(full_path)
 
-        console.print(f"[bold blue]✓[/bold blue] Added folder '[bright_cyan]{directory_path}[/bright_cyan]' to conversation.")
+        console.print(
+            f"[bold blue]✓[/bold blue] Added folder '[bright_cyan]{directory_path}[/bright_cyan]' to conversation."
+        )
         if added_files:
-            console.print(f"\n[bold bright_blue]📁 Added files:[/bold bright_blue] [dim]({len(added_files)} of {total_files_processed})[/dim]")
+            console.print(
+                f"\n[bold bright_blue]📁 Added files:[/bold bright_blue] [dim]({len(added_files)} of {total_files_processed})[/dim]"
+            )
             for f in added_files:
                 console.print(f"  [bright_cyan]📄 {f}[/bright_cyan]")
         if skipped_files:
-            console.print(f"\n[bold yellow]⏭ Skipped files:[/bold yellow] [dim]({len(skipped_files)})[/dim]")
+            console.print(
+                f"\n[bold yellow]⏭ Skipped files:[/bold yellow] [dim]({len(skipped_files)})[/dim]"
+            )
             for f in skipped_files[:10]:  # Show only first 10 to avoid clutter
                 console.print(f"  [yellow dim]⚠ {f}[/yellow dim]")
             if len(skipped_files) > 10:
                 console.print(f"  [dim]... and {len(skipped_files) - 10} more[/dim]")
         console.print()
 
+
 def is_binary_file(file_path: str, peek_size: int = 1024) -> bool:
     try:
-        with open(file_path, 'rb') as f:
+        with open(file_path, "rb") as f:
             chunk = f.read(peek_size)
         # If there is a null byte in the sample, treat it as binary
-        if b'\0' in chunk:
+        if b"\0" in chunk:
             return True
         return False
     except Exception:
         # If we fail to read, just treat it as binary to be safe
         return True
+
 
 def ensure_file_in_context(file_path: str) -> bool:
     try:
@@ -850,24 +1145,29 @@ def ensure_file_in_context(file_path: str) -> bool:
         content = read_local_file(normalized_path)
         file_marker = f"Content of file '{normalized_path}'"
         if not any(file_marker in msg["content"] for msg in conversation_history):
-            conversation_history.append({
-                "role": "system",
-                "content": f"{file_marker}:\n\n{content}"
-            })
+            conversation_history.append(
+                {"role": "system", "content": f"{file_marker}:\n\n{content}"}
+            )
         return True
     except OSError:
-        console.print(f"[bold red]✗[/bold red] Could not read file '[bright_cyan]{file_path}[/bright_cyan]' for editing context")
+        console.print(
+            f"[bold red]✗[/bold red] Could not read file '[bright_cyan]{file_path}[/bright_cyan]' for editing context"
+        )
         return False
+
 
 def normalize_path(path_str: str) -> str:
     """Return a canonical, absolute version of the path with security checks."""
     path = Path(path_str).resolve()
-    
+
     # Prevent directory traversal attacks
     if ".." in path.parts:
-        raise ValueError(f"Invalid path: {path_str} contains parent directory references")
-    
+        raise ValueError(
+            f"Invalid path: {path_str} contains parent directory references"
+        )
+
     return str(path)
+
 
 def undo_last_change(num_undos: int = 1):
     """Undo the most recent file creation or edit operations."""
@@ -885,22 +1185,26 @@ def undo_last_change(num_undos: int = 1):
             if action == "create":
                 if os.path.exists(path):
                     os.remove(path)
-                    console.print(f"[bold blue]✓[/bold blue] Deleted file '[bright_cyan]{path}[/bright_cyan]' (undo creation)")
+                    console.print(
+                        f"[bold blue]✓[/bold blue] Deleted file '[bright_cyan]{path}[/bright_cyan]' (undo creation)"
+                    )
             elif action == "edit":
                 Path(path).parent.mkdir(parents=True, exist_ok=True)
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(backup or "")
-                console.print(f"[bold blue]✓[/bold blue] Restored file '[bright_cyan]{path}[/bright_cyan]' (undo edit)")
+                console.print(
+                    f"[bold blue]✓[/bold blue] Restored file '[bright_cyan]{path}[/bright_cyan]' (undo edit)"
+                )
         except Exception as e:
             console.print(f"[bold red]✗ Failed to undo change: {e}[/bold red]")
             break
 
+
 # --------------------------------------------------------------------------------
 # 5. Conversation state
 # --------------------------------------------------------------------------------
-conversation_history = [
-    {"role": "system", "content": system_PROMPT}
-]
+conversation_history = [{"role": "system", "content": system_PROMPT}]
+
 
 def print_help() -> None:
     table = Table(title="Available Tools", show_header=True, header_style="bold cyan")
@@ -912,28 +1216,31 @@ def print_help() -> None:
         table.add_row(name, desc)
     console.print(table)
 
+
 def parse_args():
     parser = argparse.ArgumentParser(description="Devstral Engineer")
-    parser.add_argument('-v', '--verbose', action='store_true', help='verbose output')
-    parser.add_argument('--debug', action='store_true', help='debug output')
+    parser.add_argument("-v", "--verbose", action="store_true", help="verbose output")
+    parser.add_argument("--debug", action="store_true", help="debug output")
     return parser.parse_args()
+
 
 # --------------------------------------------------------------------------------
 # 6. OpenAI API interaction with streaming
 # --------------------------------------------------------------------------------
+
 
 def execute_function_call_dict(tool_call_dict) -> str:
     """Execute a function call from a dictionary format and return the result as a string."""
     try:
         function_name = tool_call_dict["function"]["name"]
         arguments = json.loads(tool_call_dict["function"]["arguments"])
-        
+
         if function_name == "read_file":
             file_path = arguments["file_path"]
             normalized_path = normalize_path(file_path)
             content = read_local_file(normalized_path)
             return f"Content of file '{normalized_path}':\n\n{content}"
-            
+
         elif function_name == "read_multiple_files":
             file_paths = arguments["file_paths"]
             results = []
@@ -944,14 +1251,14 @@ def execute_function_call_dict(tool_call_dict) -> str:
                     results.append(f"Content of file '{normalized_path}':\n\n{content}")
                 except OSError as e:
                     results.append(f"Error reading '{file_path}': {e}")
-            return "\n\n" + "="*50 + "\n\n".join(results)
-            
+            return "\n\n" + "=" * 50 + "\n\n".join(results)
+
         elif function_name == "create_file":
             file_path = arguments["file_path"]
             content = arguments["content"]
             create_file(file_path, content)
             return f"Successfully created file '{file_path}'"
-            
+
         elif function_name == "create_multiple_files":
             files = arguments["files"]
             created_files = []
@@ -959,19 +1266,18 @@ def execute_function_call_dict(tool_call_dict) -> str:
                 create_file(file_info["path"], file_info["content"])
                 created_files.append(file_info["path"])
             return f"Successfully created {len(created_files)} files: {', '.join(created_files)}"
-            
+
         elif function_name == "edit_file":
             file_path = arguments["file_path"]
             original_snippet = arguments["original_snippet"]
             new_snippet = arguments["new_snippet"]
-            
+
             # Ensure file is in context first
             if not ensure_file_in_context(file_path):
                 return f"Error: Could not read file '{file_path}' for editing"
-            
+
             apply_diff_edit(file_path, original_snippet, new_snippet)
             return f"Successfully edited file '{file_path}'"
-
 
         elif function_name == "linter_checker":
             path = arguments.get("path", ".")
@@ -982,6 +1288,17 @@ def execute_function_call_dict(tool_call_dict) -> str:
             path = arguments.get("path", ".")
             cmd = arguments.get("formatter_command", "black")
             return formatter(path, cmd)
+
+        elif function_name == "grep":
+            pattern = arguments["pattern"]
+            file_path = arguments["file_path"]
+            ignore = arguments.get("ignore_case", False)
+            return grep(pattern, file_path, ignore)
+
+        elif function_name == "glob":
+            pattern = arguments["pattern"]
+            cwd = arguments.get("cwd", ".")
+            return glob(pattern, cwd)
 
         elif function_name == "list_directory":
             path = arguments.get("path", ".")
@@ -1036,22 +1353,23 @@ def execute_function_call_dict(tool_call_dict) -> str:
 
         else:
             return f"Unknown function: {function_name}"
-            
+
     except Exception as e:
         return f"Error executing {function_name}: {str(e)}"
+
 
 def execute_function_call(tool_call) -> str:
     """Execute a function call and return the result as a string."""
     try:
         function_name = tool_call.function.name
         arguments = json.loads(tool_call.function.arguments)
-        
+
         if function_name == "read_file":
             file_path = arguments["file_path"]
             normalized_path = normalize_path(file_path)
             content = read_local_file(normalized_path)
             return f"Content of file '{normalized_path}':\n\n{content}"
-            
+
         elif function_name == "read_multiple_files":
             file_paths = arguments["file_paths"]
             results = []
@@ -1062,14 +1380,14 @@ def execute_function_call(tool_call) -> str:
                     results.append(f"Content of file '{normalized_path}':\n\n{content}")
                 except OSError as e:
                     results.append(f"Error reading '{file_path}': {e}")
-            return "\n\n" + "="*50 + "\n\n".join(results)
-            
+            return "\n\n" + "=" * 50 + "\n\n".join(results)
+
         elif function_name == "create_file":
             file_path = arguments["file_path"]
             content = arguments["content"]
             create_file(file_path, content)
             return f"Successfully created file '{file_path}'"
-            
+
         elif function_name == "create_multiple_files":
             files = arguments["files"]
             created_files = []
@@ -1077,24 +1395,25 @@ def execute_function_call(tool_call) -> str:
                 create_file(file_info["path"], file_info["content"])
                 created_files.append(file_info["path"])
             return f"Successfully created {len(created_files)} files: {', '.join(created_files)}"
-            
+
         elif function_name == "edit_file":
             file_path = arguments["file_path"]
             original_snippet = arguments["original_snippet"]
             new_snippet = arguments["new_snippet"]
-            
+
             # Ensure file is in context first
             if not ensure_file_in_context(file_path):
                 return f"Error: Could not read file '{file_path}' for editing"
-            
+
             apply_diff_edit(file_path, original_snippet, new_snippet)
             return f"Successfully edited file '{file_path}'"
-            
+
         else:
             return f"Unknown function: {function_name}"
-            
+
     except Exception as e:
         return f"Error executing {function_name}: {str(e)}"
+
 
 def trim_conversation_history():
     """Trim conversation history based on token count."""
@@ -1123,19 +1442,24 @@ def trim_conversation_history():
                 conversation_history.pop(i)
                 break
 
+
 def stream_openai_response(user_message: str):
     # Add the user message to conversation history
     conversation_history.append({"role": "user", "content": user_message})
-    
+
     # Trim conversation history if it's getting too long
     trim_conversation_history()
 
     if tiktoken:
         encoder = tiktoken.get_encoding("cl100k_base")
-        total_tokens = sum(len(encoder.encode(m.get("content") or "")) for m in conversation_history)
+        total_tokens = sum(
+            len(encoder.encode(m.get("content") or "")) for m in conversation_history
+        )
         TOKEN_LIMIT = 64000
         if total_tokens > TOKEN_LIMIT * 0.8:
-            console.print(f"[bold yellow]⚠ Token usage: {total_tokens}/{TOKEN_LIMIT}[/bold yellow]")
+            console.print(
+                f"[bold yellow]⚠ Token usage: {total_tokens}/{TOKEN_LIMIT}[/bold yellow]"
+            )
 
     # Remove the old file guessing logic since we'll use function calls
     try:
@@ -1160,7 +1484,10 @@ def stream_openai_response(user_message: str):
 
         for chunk in stream:
             # Handle reasoning content if available
-            if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
+            if (
+                hasattr(chunk.choices[0].delta, "reasoning_content")
+                and chunk.choices[0].delta.reasoning_content
+            ):
                 if not reasoning_started:
                     console.print("\n[bold blue]💭 Reasoning:[/bold blue]")
                     reasoning_started = True
@@ -1169,7 +1496,9 @@ def stream_openai_response(user_message: str):
             elif chunk.choices[0].delta.content:
                 if reasoning_started:
                     console.print("\n")  # Add spacing after reasoning
-                    console.print("\n[bold bright_blue]🤖 Assistant>[/bold bright_blue] ", end="")
+                    console.print(
+                        "\n[bold bright_blue]🤖 Assistant>[/bold bright_blue] ", end=""
+                    )
                     reasoning_started = False
                 final_content += chunk.choices[0].delta.content
                 console.print(chunk.choices[0].delta.content, end="")
@@ -1179,80 +1508,100 @@ def stream_openai_response(user_message: str):
                     if tool_call_delta.index is not None:
                         # Ensure we have enough tool_calls
                         while len(tool_calls) <= tool_call_delta.index:
-                            tool_calls.append({
-                                "id": "",
-                                "type": "function",
-                                "function": {"name": "", "arguments": ""}
-                            })
-                        
+                            tool_calls.append(
+                                {
+                                    "id": "",
+                                    "type": "function",
+                                    "function": {"name": "", "arguments": ""},
+                                }
+                            )
+
                         if tool_call_delta.id:
                             tool_calls[tool_call_delta.index]["id"] = tool_call_delta.id
                         if tool_call_delta.function:
                             if tool_call_delta.function.name:
-                                tool_calls[tool_call_delta.index]["function"]["name"] += tool_call_delta.function.name
+                                tool_calls[tool_call_delta.index]["function"][
+                                    "name"
+                                ] += tool_call_delta.function.name
                             if tool_call_delta.function.arguments:
-                                tool_calls[tool_call_delta.index]["function"]["arguments"] += tool_call_delta.function.arguments
+                                tool_calls[tool_call_delta.index]["function"][
+                                    "arguments"
+                                ] += tool_call_delta.function.arguments
 
         console.print()  # New line after streaming
 
         # Store the assistant's response in conversation history
         assistant_message = {
             "role": "assistant",
-            "content": final_content if final_content else None
+            "content": final_content if final_content else None,
         }
-        
+
         if tool_calls:
             # Convert our tool_calls format to the expected format
             formatted_tool_calls = []
             for i, tc in enumerate(tool_calls):
                 if tc["function"]["name"]:  # Only add if we have a function name
                     # Ensure we have a valid tool call ID
-                    tool_id = tc["id"] if tc["id"] else f"call_{i}_{int(time.time() * 1000)}"
-                    
-                    formatted_tool_calls.append({
-                        "id": tool_id,
-                        "type": "function",
-                        "function": {
-                            "name": tc["function"]["name"],
-                            "arguments": tc["function"]["arguments"]
+                    tool_id = (
+                        tc["id"] if tc["id"] else f"call_{i}_{int(time.time() * 1000)}"
+                    )
+
+                    formatted_tool_calls.append(
+                        {
+                            "id": tool_id,
+                            "type": "function",
+                            "function": {
+                                "name": tc["function"]["name"],
+                                "arguments": tc["function"]["arguments"],
+                            },
                         }
-                    })
-            
+                    )
+
             if formatted_tool_calls:
                 # Important: When there are tool calls, content should be None or empty
                 if not final_content:
                     assistant_message["content"] = None
-                    
+
                 assistant_message["tool_calls"] = formatted_tool_calls
                 conversation_history.append(assistant_message)
-                
+
                 # Execute tool calls and add results immediately
-                console.print(f"\n[bold bright_cyan]⚡ Executing {len(formatted_tool_calls)} function call(s)...[/bold bright_cyan]")
+                console.print(
+                    f"\n[bold bright_cyan]⚡ Executing {len(formatted_tool_calls)} function call(s)...[/bold bright_cyan]"
+                )
                 for tool_call in formatted_tool_calls:
-                    console.print(f"[bright_blue]→ {tool_call['function']['name']}[/bright_blue]")
-                    
+                    console.print(
+                        f"[bright_blue]→ {tool_call['function']['name']}[/bright_blue]"
+                    )
+
                     try:
                         result = execute_function_call_dict(tool_call)
-                        
+
                         # Add tool result to conversation immediately
                         tool_response = {
                             "role": "tool",
                             "tool_call_id": tool_call["id"],
-                            "content": result
+                            "content": result,
                         }
                         conversation_history.append(tool_response)
                     except Exception as e:
-                        console.print(f"[red]Error executing {tool_call['function']['name']}: {e}[/red]")
+                        console.print(
+                            f"[red]Error executing {tool_call['function']['name']}: {e}[/red]"
+                        )
                         # Still need to add a tool response even on error
-                        conversation_history.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call["id"],
-                            "content": f"Error: {str(e)}"
-                        })
-                
+                        conversation_history.append(
+                            {
+                                "role": "tool",
+                                "tool_call_id": tool_call["id"],
+                                "content": f"Error: {str(e)}",
+                            }
+                        )
+
                 # Get follow-up response after tool execution
-                console.print("\n[bold bright_blue]🔄 Processing results...[/bold bright_blue]")
-                
+                console.print(
+                    "\n[bold bright_blue]🔄 Processing results...[/bold bright_blue]"
+                )
+
                 follow_up_stream = client.chat.completions.create(
                     model=DEFAULT_MODEL,
                     messages=conversation_history,
@@ -1265,13 +1614,16 @@ def stream_openai_response(user_message: str):
                     },
                     extra_body={},
                 )
-                
+
                 follow_up_content = ""
                 reasoning_started = False
-                
+
                 for chunk in follow_up_stream:
                     # Handle reasoning content if available
-                    if hasattr(chunk.choices[0].delta, 'reasoning_content') and chunk.choices[0].delta.reasoning_content:
+                    if (
+                        hasattr(chunk.choices[0].delta, "reasoning_content")
+                        and chunk.choices[0].delta.reasoning_content
+                    ):
                         if not reasoning_started:
                             console.print("\n[bold blue]💭 Reasoning:[/bold blue]")
                             reasoning_started = True
@@ -1279,18 +1631,20 @@ def stream_openai_response(user_message: str):
                     elif chunk.choices[0].delta.content:
                         if reasoning_started:
                             console.print("\n")
-                            console.print("\n[bold bright_blue]🤖 Assistant>[/bold bright_blue] ", end="")
+                            console.print(
+                                "\n[bold bright_blue]🤖 Assistant>[/bold bright_blue] ",
+                                end="",
+                            )
                             reasoning_started = False
                         follow_up_content += chunk.choices[0].delta.content
                         console.print(chunk.choices[0].delta.content, end="")
-                
+
                 console.print()
-                
+
                 # Store follow-up response
-                conversation_history.append({
-                    "role": "assistant",
-                    "content": follow_up_content
-                })
+                conversation_history.append(
+                    {"role": "assistant", "content": follow_up_content}
+                )
         else:
             # No tool calls, just store the regular response
             conversation_history.append(assistant_message)
@@ -1302,23 +1656,27 @@ def stream_openai_response(user_message: str):
         console.print(f"\n[bold red]❌ {error_msg}[/bold red]")
         return {"error": error_msg}
 
+
 # --------------------------------------------------------------------------------
 # 7. Main interactive loop
 # --------------------------------------------------------------------------------
+
 
 def main():
     # Create a beautiful gradient-style welcome panel
     welcome_text = """[bold bright_blue]🐋 Devstral Engineer[/bold bright_blue] [bright_cyan]with Function Calling[/bright_cyan]
 [dim blue]Powered by Devstral with Chain-of-Thought Reasoning[/dim blue]"""
-    
-    console.print(Panel.fit(
-        welcome_text,
-        border_style="bright_blue",
-        padding=(1, 2),
-        title="[bold bright_cyan]🤖 AI Code Assistant[/bold bright_cyan]",
-        title_align="center"
-    ))
-    
+
+    console.print(
+        Panel.fit(
+            welcome_text,
+            border_style="bright_blue",
+            padding=(1, 2),
+            title="[bold bright_cyan]🤖 AI Code Assistant[/bold bright_cyan]",
+            title_align="center",
+        )
+    )
+
     # Create an elegant instruction panel
     instructions = """[bold bright_blue]📁 File Operations:[/bold bright_blue]
   • [bright_cyan]/add path/to/file[/bright_cyan] - Include a single file in conversation
@@ -1333,20 +1691,24 @@ def main():
   • [bright_cyan]/deep-research your query[/bright_cyan] - Fetch articles for in-depth research
   • [bright_cyan]/edit[/bright_cyan] or [bright_cyan]/ask[/bright_cyan] - Switch modes
   • Just ask naturally - the AI will handle file operations automatically!"""
-    
-    console.print(Panel(
-        instructions,
-        border_style="blue",
-        padding=(1, 2),
-        title="[bold blue]💡 How to Use[/bold blue]",
-        title_align="left"
-    ))
+
+    console.print(
+        Panel(
+            instructions,
+            border_style="blue",
+            padding=(1, 2),
+            title="[bold blue]💡 How to Use[/bold blue]",
+            title_align="left",
+        )
+    )
     console.print()
 
     # Orientation step: show initial directory listing
     initial_ls = list_directory()
     console.print(Panel(initial_ls, title="Current Directory", border_style="cyan"))
-    conversation_history.append({"role": "system", "content": f"Directory listing:\n{initial_ls}"})
+    conversation_history.append(
+        {"role": "system", "content": f"Directory listing:\n{initial_ls}"}
+    )
 
     while True:
         try:
@@ -1359,7 +1721,9 @@ def main():
             continue
 
         if user_input.lower() in ["exit", "quit"]:
-            console.print("[bold bright_blue]👋 Goodbye! Happy coding![/bold bright_blue]")
+            console.print(
+                "[bold bright_blue]👋 Goodbye! Happy coding![/bold bright_blue]"
+            )
             break
 
         if user_input.lower() == "/help":
@@ -1388,18 +1752,25 @@ def main():
 
         if user_input.lower().startswith("/undo"):
             try:
-                num_undos = int(user_input.split()[1]) if len(user_input.split()) > 1 else 1
+                num_undos = (
+                    int(user_input.split()[1]) if len(user_input.split()) > 1 else 1
+                )
                 undo_last_change(num_undos)
             except ValueError:
-                console.print("[bold red]✗ Invalid number of undos. Usage: /undo [N][/bold red]")
+                console.print(
+                    "[bold red]✗ Invalid number of undos. Usage: /undo [N][/bold red]"
+                )
             continue
 
         response_data = stream_openai_response(user_input)
-        
+
         if response_data.get("error"):
             console.print(f"[bold red]❌ Error: {response_data['error']}[/bold red]")
 
-    console.print("[bold blue]✨ Session finished. Thank you for using Devstral Engineer![/bold blue]")
+    console.print(
+        "[bold blue]✨ Session finished. Thank you for using Devstral Engineer![/bold blue]"
+    )
+
 
 if __name__ == "__main__":
     args = parse_args()

@@ -8,7 +8,7 @@ tree_sitter
 
 pyyaml
 
-requests
+aiohttp
 beautifulsoup4
 typer
 questionary

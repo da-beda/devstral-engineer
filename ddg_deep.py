@@ -1,4 +1,4 @@
-import requests
+import aiohttp
 from bs4 import BeautifulSoup
 from typing import List, Optional
 import asyncio
@@ -10,15 +10,16 @@ SUMMARIZE_THRESHOLD = 10000
 REQUEST_DELAY = 1.0
 
 
-def fetch_ddg_page(query: str, start: int = 0) -> Optional[str]:
+async def fetch_ddg_page(query: str, start: int = 0) -> Optional[str]:
     """Fetch one DuckDuckGo results page as HTML."""
     url = "https://html.duckduckgo.com/html"
     data = {"q": query, "kl": "us-en", "kp": "-2", "s": str(start)}
     headers = {"User-Agent": "Mozilla/5.0 (Python) DevstralDeep/1.0"}
     try:
-        resp = requests.post(url, data=data, headers=headers, timeout=10)
-        resp.raise_for_status()
-        return resp.text
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, data=data, headers=headers, timeout=10) as resp:
+                resp.raise_for_status()
+                return await resp.text()
     except Exception as e:
         print(f"[ddg_deep] Error fetching page {start}: {e}")
         return None
@@ -37,16 +38,18 @@ def parse_ddg_results(html: str) -> List[str]:
     return urls
 
 
-def fetch_article_text(url: str) -> str:
+async def fetch_article_text(url: str) -> str:
     """Fetch the given URL and try to extract main textual content."""
     try:
-        resp = requests.get(
-            url,
-            headers={"User-Agent": "Mozilla/5.0 (Python) DevstralDeep/1.0"},
-            timeout=10,
-        )
-        resp.raise_for_status()
-        soup = BeautifulSoup(resp.text, "html.parser")
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 (Python) DevstralDeep/1.0"},
+                timeout=10,
+            ) as resp:
+                resp.raise_for_status()
+                text = await resp.text()
+        soup = BeautifulSoup(text, "html.parser")
         art = soup.find("article")
         if art:
             txt = art.get_text("\n", strip=True)
@@ -62,9 +65,8 @@ def fetch_article_text(url: str) -> str:
 
 
 async def fetch_article_text_async(url: str) -> str:
-    """Async wrapper for fetch_article_text using thread executor."""
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, fetch_article_text, url)
+    """Backward compatible wrapper for :func:`fetch_article_text`."""
+    return await fetch_article_text(url)
 
 
 async def to_markdown(urls: List[str]) -> str:
@@ -95,10 +97,9 @@ async def to_markdown(urls: List[str]) -> str:
 async def deep_research(query: str) -> str:
     """Perform multi-page DuckDuckGo scraping and return Markdown."""
     collected: List[str] = []
-    loop = asyncio.get_event_loop()
     for page in range(MAX_DDG_PAGES):
         start_idx = page * RESULTS_PER_PAGE
-        html = await loop.run_in_executor(None, fetch_ddg_page, query, start_idx)
+        html = await fetch_ddg_page(query, start_idx)
         if not html:
             break
         page_urls = parse_ddg_results(html)

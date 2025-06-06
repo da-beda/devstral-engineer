@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional, Tuple
 import re
 import subprocess
 import shlex
-from openai import OpenAI
+from openai import AsyncOpenAI
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from config import Config
@@ -23,7 +23,7 @@ import argparse
 import difflib
 
 # DuckDuckGo helper for on-demand web search
-from ddg_search import ddg_search, ddg_results_to_markdown
+from ddg_search import async_ddg_search, ddg_results_to_markdown
 
 # Deep research helper for multi-page scraping
 from ddg_deep import deep_research
@@ -64,7 +64,7 @@ prompt_session = PromptSession(
 # --------------------------------------------------------------------------------
 load_dotenv()  # Load environment variables from .env file
 cfg = Config.load()
-client = OpenAI(
+client = AsyncOpenAI(
     base_url="https://openrouter.ai/api/v1",
     api_key=cfg.api_key,
 )
@@ -712,7 +712,7 @@ def glob(pattern: str, cwd: str = ".") -> str:
     return "\n".join(matches)
 
 
-def view(file_path: str, offset: int = 0, limit: int = 40) -> str:
+async def view(file_path: str, offset: int = 0, limit: int = 40) -> str:
     """Return a slice of a text file starting at line ``offset``.
 
     ``limit`` specifies the maximum number of lines to display. If the file
@@ -740,13 +740,13 @@ def view(file_path: str, offset: int = 0, limit: int = 40) -> str:
         result += f"\n... ({total - end} more lines)"
 
     if total > 400:
-        summary = summarize_code(normalized_path)
+        summary = await summarize_code(normalized_path)
         result += f"\n\nSummary:\n{summary}"
 
     return result.strip()
 
 
-def summarize_code(file_path: str) -> str:
+async def summarize_code(file_path: str) -> str:
     """Summarize a code file using the model. Large files are truncated based on token count."""
     try:
         content = read_local_file(normalize_path(file_path))
@@ -762,7 +762,7 @@ def summarize_code(file_path: str) -> str:
     prompt = f"Summarize the following code:\n\n```\n{content}\n```"
 
     try:
-        resp = client.chat.completions.create(
+        resp = await client.chat.completions.create(
             model=DEFAULT_MODEL,
             messages=[{"role": "user", "content": prompt}],
         )
@@ -885,7 +885,7 @@ def apply_diff_edit(path: str, original_snippet: str, new_snippet: str):
         )
 
 
-def try_handle_add_command(user_input: str) -> bool:
+async def try_handle_add_command(user_input: str) -> bool:
     prefix = "/add "
     if user_input.strip().lower().startswith(prefix):
         path_to_add = user_input[len(prefix) :].strip()
@@ -893,7 +893,7 @@ def try_handle_add_command(user_input: str) -> bool:
             normalized_path = normalize_path(path_to_add)
             if os.path.isdir(normalized_path):
                 # Handle entire directory
-                add_directory_to_conversation(normalized_path)
+                await add_directory_to_conversation(normalized_path)
             else:
                 # Handle a single file as before
                 content = read_local_file(normalized_path)
@@ -914,7 +914,7 @@ def try_handle_add_command(user_input: str) -> bool:
     return False
 
 
-def try_handle_search_command(user_input: str) -> bool:
+async def try_handle_search_command(user_input: str) -> bool:
     """Handle '/search <query>' commands by fetching DuckDuckGo results."""
     prefix = "/search "
     if not user_input.lower().startswith(prefix):
@@ -927,7 +927,7 @@ def try_handle_search_command(user_input: str) -> bool:
 
     console.print(f"[bold blue]🔍 Searching DuckDuckGo for:[/bold blue] '{query}'")
     try:
-        results = ddg_search(query, max_results=5)
+        results = await async_ddg_search(query, max_results=5)
         if not results:
             console.print("[bold yellow]⚠ No results found.[/bold yellow]")
             add_to_history(
@@ -952,7 +952,7 @@ def try_handle_search_command(user_input: str) -> bool:
     return True
 
 
-def try_handle_deep_command(user_input: str) -> bool:
+async def try_handle_deep_command(user_input: str) -> bool:
     """Handle '/deep-research <query>' for multi-page scraping."""
     prefix = "/deep-research "
     if not user_input.lower().startswith(prefix):
@@ -967,7 +967,7 @@ def try_handle_deep_command(user_input: str) -> bool:
         f"[bold blue]🔎 Starting Deep Research for:[/bold blue] '{query_terms}'"
     )
     try:
-        md_content = asyncio.run(deep_research(query_terms))
+        md_content = await deep_research(query_terms)
         add_to_history({"role": "system", "content": md_content})
         console.print(
             Panel(
@@ -987,7 +987,7 @@ def try_handle_deep_command(user_input: str) -> bool:
     return True
 
 
-def add_directory_to_conversation(directory_path: str):
+async def add_directory_to_conversation(directory_path: str):
     with console.status(
         "[bold bright_blue]🔍 Scanning directory...[/bold bright_blue]"
     ) as status:
@@ -1177,7 +1177,7 @@ def add_directory_to_conversation(directory_path: str):
                     added_files.append(path)
 
         if eligible_files:
-            asyncio.run(_read_files(eligible_files))
+            await _read_files(eligible_files)
 
         total_files_processed = len(added_files)
 
@@ -1360,7 +1360,7 @@ def print_profiling_stats() -> None:
 # --------------------------------------------------------------------------------
 
 
-def execute_function_call_dict(tool_call_dict) -> str:
+async def execute_function_call_dict(tool_call_dict) -> str:
     """Execute a function call from a dictionary format and return the result as a string."""
     try:
         function_name = tool_call_dict["function"]["name"]
@@ -1388,7 +1388,7 @@ def execute_function_call_dict(tool_call_dict) -> str:
             file_path = arguments["file_path"]
             offset = arguments.get("offset", 0)
             limit = arguments.get("limit", 40)
-            return view(file_path, offset, limit)
+            return await view(file_path, offset, limit)
 
         elif function_name == "create_file":
             file_path = arguments["file_path"]
@@ -1462,7 +1462,7 @@ def execute_function_call_dict(tool_call_dict) -> str:
 
         elif function_name == "summarize_code":
             file_path = arguments["file_path"]
-            return summarize_code(file_path)
+            return await summarize_code(file_path)
 
         elif function_name == "git_status":
             return git_status()
@@ -1495,7 +1495,7 @@ def execute_function_call_dict(tool_call_dict) -> str:
         return f"Error executing {function_name}: {str(e)}"
 
 
-def execute_function_call(tool_call) -> str:
+async def execute_function_call(tool_call) -> str:
     """Execute a function call and return the result as a string."""
     try:
         function_name = tool_call.function.name
@@ -1523,7 +1523,7 @@ def execute_function_call(tool_call) -> str:
             file_path = arguments["file_path"]
             offset = arguments.get("offset", 0)
             limit = arguments.get("limit", 40)
-            return view(file_path, offset, limit)
+            return await view(file_path, offset, limit)
 
         elif function_name == "create_file":
             file_path = arguments["file_path"]
@@ -1594,7 +1594,7 @@ def trim_conversation_history():
             )
 
 
-def stream_openai_response(user_message: str):
+async def stream_openai_response(user_message: str):
     # Add the user message to conversation history
     add_to_history({"role": "user", "content": user_message})
 
@@ -1611,7 +1611,7 @@ def stream_openai_response(user_message: str):
 
     # Remove the old file guessing logic since we'll use function calls
     try:
-        stream = client.chat.completions.create(
+        stream = await client.chat.completions.create(
             model=DEFAULT_MODEL,
             messages=conversation_history,
             tools=tools,
@@ -1630,7 +1630,7 @@ def stream_openai_response(user_message: str):
         final_content = ""
         tool_calls = []
 
-        for chunk in stream:
+        async for chunk in stream:
             # Handle reasoning content if available
             if (
                 hasattr(chunk.choices[0].delta, "reasoning_content")
@@ -1723,7 +1723,7 @@ def stream_openai_response(user_message: str):
                     )
 
                     try:
-                        result = execute_function_call_dict(tool_call)
+                        result = await execute_function_call_dict(tool_call)
 
                         # Add tool result to conversation immediately
                         tool_response = {
@@ -1750,7 +1750,7 @@ def stream_openai_response(user_message: str):
                     "\n[bold bright_blue]🔄 Processing results...[/bold bright_blue]"
                 )
 
-                follow_up_stream = client.chat.completions.create(
+                follow_up_stream = await client.chat.completions.create(
                     model=DEFAULT_MODEL,
                     messages=conversation_history,
                     tools=tools,
@@ -1766,7 +1766,7 @@ def stream_openai_response(user_message: str):
                 follow_up_content = ""
                 reasoning_started = False
 
-                for chunk in follow_up_stream:
+                async for chunk in follow_up_stream:
                     # Handle reasoning content if available
                     if (
                         hasattr(chunk.choices[0].delta, "reasoning_content")
@@ -1808,7 +1808,7 @@ def stream_openai_response(user_message: str):
 # --------------------------------------------------------------------------------
 
 
-def main():
+async def main():
     # Create a beautiful gradient-style welcome panel
     welcome_text = """[bold bright_blue]🐋 Devstral Engineer[/bold bright_blue] [bright_cyan]with Function Calling[/bright_cyan]
 [dim blue]Powered by Devstral with Chain-of-Thought Reasoning[/dim blue]"""
@@ -1856,7 +1856,7 @@ def main():
 
     while True:
         try:
-            user_input = prompt_session.prompt("🔵 You> ").strip()
+            user_input = (await prompt_session.prompt_async("🔵 You> ")).strip()
         except (EOFError, KeyboardInterrupt):
             console.print("\n[bold yellow]👋 Exiting gracefully...[/bold yellow]")
             break
@@ -1885,13 +1885,13 @@ def main():
             console.print("[bold cyan]Switched to ASK mode[/bold cyan]")
             continue
 
-        if try_handle_add_command(user_input):
+        if await try_handle_add_command(user_input):
             continue
 
-        if try_handle_search_command(user_input):
+        if await try_handle_search_command(user_input):
             continue
 
-        if try_handle_deep_command(user_input):
+        if await try_handle_deep_command(user_input):
             continue
 
         if user_input.lower().startswith("/undo"):
@@ -1906,7 +1906,7 @@ def main():
                 )
             continue
 
-        response_data = stream_openai_response(user_input)
+        response_data = await stream_openai_response(user_input)
 
         if response_data.get("error"):
             console.print(f"[bold red]❌ Error: {response_data['error']}[/bold red]")
@@ -1921,4 +1921,4 @@ if __name__ == "__main__":
     args = parse_args()
     VERBOSE = args.verbose
     DEBUG = args.debug
-    main()
+    asyncio.run(main())

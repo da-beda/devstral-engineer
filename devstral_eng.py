@@ -28,6 +28,7 @@ from ddg_search import async_ddg_search, ddg_results_to_markdown
 
 # Deep research helper for multi-page scraping
 from ddg_deep import deep_research
+from conversation_store import load_history, save_history
 import asyncio
 
 try:
@@ -1290,7 +1291,10 @@ def undo_last_change(num_undos: int = 1):
 # --------------------------------------------------------------------------------
 # 5. Conversation state
 # --------------------------------------------------------------------------------
-conversation_history = [{"role": "system", "content": system_PROMPT}]
+conversation_history = load_history()
+if not conversation_history:
+    conversation_history = [{"role": "system", "content": system_PROMPT}]
+    save_history(conversation_history)
 
 
 def _manage_context_window(
@@ -1327,6 +1331,7 @@ def add_to_history(message: Dict[str, Any]) -> None:
     """Append a message and manage context size."""
     conversation_history.append(message)
     _manage_context_window()
+    save_history(conversation_history)
 
 
 def print_help() -> None:
@@ -1341,7 +1346,9 @@ def print_help() -> None:
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Devstral Engineer")
+    parser = argparse.ArgumentParser(
+        description="Devstral Engineer (conversation history persists between runs)"
+    )
     parser.add_argument("-v", "--verbose", action="store_true", help="verbose output")
     parser.add_argument(
         "--debug", action="store_true", help="debug output with profiling"

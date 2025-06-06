@@ -3,7 +3,9 @@ from config import Config, CONFIG_FILE
 from ddg_search import clear_ddg_cache
 from .chat import chat
 
-app = typer.Typer(help="Devstral Engineer CLI")
+app = typer.Typer(
+    help="Devstral Engineer CLI - conversation history is saved between sessions"
+)
 
 
 @app.callback(invoke_without_command=True)

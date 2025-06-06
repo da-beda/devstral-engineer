@@ -1,8 +1,8 @@
-# DeepSeek Engineer v2 🐋
+# Devstral Engineer v2 🐋
 
 ## Overview
 
-DeepSeek Engineer v2 is a powerful AI-powered coding assistant that provides an interactive terminal interface for seamless code development. It integrates with DeepSeek's advanced reasoning models to offer intelligent file operations, code analysis, and development assistance through natural conversation and function calling.
+Devstral Engineer v2 is a powerful AI-powered coding assistant that provides an interactive terminal interface for seamless code development. It integrates with Devstral's advanced reasoning models to offer intelligent file operations, code analysis, and development assistance through natural conversation and function calling.
 
 ## 🚀 Latest Update: Function Calling Architecture
 
@@ -78,7 +78,7 @@ For when you want to preload files into conversation context:
 ## Getting Started
 
 ### Prerequisites
-1. **DeepSeek API Key**: Get your API key from [DeepSeek Platform](https://platform.deepseek.com)
+1. **OpenRouter API Key**: Get your API key from [OpenRouter](https://openrouter.ai)
 2. **Python 3.11+**: Required for optimal performance
 
 ### Installation
@@ -86,13 +86,13 @@ For when you want to preload files into conversation context:
 1. **Clone the repository**:
    ```bash
    git clone <repository-url>
-   cd deepseek-engineer
+   cd devstral-engineer
    ```
 
 2. **Set up environment**:
    ```bash
    # Create .env file
-   echo "DEEPSEEK_API_KEY=your_api_key_here" > .env
+   echo "OPENROUTER_API_KEY=your_api_key_here" > .env
    ```
 
 3. **Install dependencies** (choose one method):
@@ -100,13 +100,13 @@ For when you want to preload files into conversation context:
    #### Using uv (recommended - faster)
    ```bash
    uv venv
-   uv run deepseek-eng.py
+   uv run devstral-eng.py
    ```
 
    #### Using pip
    ```bash
    pip install -r requirements.txt
-   python3 deepseek-eng.py
+   python3 devstral-eng.py
    ```
 
 ### Usage Examples
@@ -165,8 +165,8 @@ You> Now review this codebase structure
 
 ## Technical Details
 
-### **Model**: DeepSeek-Reasoner
-- Powered by DeepSeek-R1 with Chain-of-Thought reasoning
+### **Model**: mistralai/devstral-small:free
+- Powered by Devstral with Chain-of-Thought reasoning
 - Real-time reasoning visibility during processing
 - Enhanced problem-solving capabilities
 
@@ -227,7 +227,7 @@ Based on my analysis of your project, here's a comprehensive refactoring plan...
 **API Key Not Found**
 ```bash
 # Make sure .env file exists with your API key
-echo "DEEPSEEK_API_KEY=your_key_here" > .env
+echo "OPENROUTER_API_KEY=your_key_here" > .env
 ```
 
 **Import Errors**
@@ -242,12 +242,12 @@ uv sync  # or pip install -r requirements.txt
 
 ## Contributing
 
-This is an experimental project showcasing DeepSeek reasoning model capabilities. Contributions are welcome!
+This is an experimental project showcasing Devstral reasoning model capabilities. Contributions are welcome!
 
 ### **Development Setup**
 ```bash
 git clone <repository-url>
-cd deepseek-engineer
+cd devstral-engineer
 uv venv
 uv sync
 ```
@@ -255,20 +255,20 @@ uv sync
 ### **Run**
 ```bash
 # Run the application (preferred)
-uv run deepseek-eng.py
+uv run devstral-eng.py
 ```
 or
 ```bash
-python3 deepseek-eng.py
+python3 devstral-eng.py
 ```
 
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-This project is experimental and developed for testing DeepSeek reasoning model capabilities.
+This project is experimental and developed for testing Devstral reasoning model capabilities.
 
 ---
 
-> **Note**: This is an experimental project developed to explore the capabilities of DeepSeek's reasoning model with function calling. The AI can automatically read files you mention in conversation, while the `/add` command is available for when you want to preload context. Use responsibly and enjoy the enhanced AI pair programming experience! 🚀
+> **Note**: This is an experimental project developed to explore the capabilities of Devstral's reasoning model with function calling. The AI can automatically read files you mention in conversation, while the `/add` command is available for when you want to preload context. Use responsibly and enjoy the enhanced AI pair programming experience! 🚀
 

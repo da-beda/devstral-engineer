@@ -43,7 +43,7 @@ wheels = [
 ]
 
 [[package]]
-name = "deepseek-engineer"
+name = "devstral-engineer"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

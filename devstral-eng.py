@@ -32,9 +32,9 @@ prompt_session = PromptSession(
 # --------------------------------------------------------------------------------
 load_dotenv()  # Load environment variables from .env file
 client = OpenAI(
-    api_key=os.getenv("DEEPSEEK_API_KEY"),
-    base_url="https://api.deepseek.com"
-)  # Configure for DeepSeek API
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENROUTER_API_KEY"),
+)
 
 # --------------------------------------------------------------------------------
 # 2. Define our schema using Pydantic for type safety
@@ -166,7 +166,7 @@ tools = [
 # 3. system prompt
 # --------------------------------------------------------------------------------
 system_PROMPT = dedent("""\
-    You are an elite software engineer called DeepSeek Engineer with decades of experience across all programming domains.
+    You are an elite software engineer called Devstral Engineer with decades of experience across all programming domains.
     Your expertise spans system design, algorithms, testing, and best practices.
     You provide thoughtful, well-structured solutions while explaining your reasoning.
 
@@ -586,11 +586,16 @@ def stream_openai_response(user_message: str):
     # Remove the old file guessing logic since we'll use function calls
     try:
         stream = client.chat.completions.create(
-            model="deepseek-reasoner",
+            model="mistralai/devstral-small:free",
             messages=conversation_history,
             tools=tools,
             max_completion_tokens=64000,
-            stream=True
+            stream=True,
+            extra_headers={
+                "HTTP-Referer": os.getenv("HTTP_REFERER", ""),
+                "X-Title": os.getenv("SITE_TITLE", "Devstral Engineer"),
+            },
+            extra_body={},
         )
 
         console.print("\n[bold bright_blue]🐋 Seeking...[/bold bright_blue]")
@@ -695,11 +700,16 @@ def stream_openai_response(user_message: str):
                 console.print("\n[bold bright_blue]🔄 Processing results...[/bold bright_blue]")
                 
                 follow_up_stream = client.chat.completions.create(
-                    model="deepseek-reasoner",
+                    model="mistralai/devstral-small:free",
                     messages=conversation_history,
                     tools=tools,
                     max_completion_tokens=64000,
-                    stream=True
+                    stream=True,
+                    extra_headers={
+                        "HTTP-Referer": os.getenv("HTTP_REFERER", ""),
+                        "X-Title": os.getenv("SITE_TITLE", "Devstral Engineer"),
+                    },
+                    extra_body={},
                 )
                 
                 follow_up_content = ""
@@ -734,7 +744,7 @@ def stream_openai_response(user_message: str):
         return {"success": True}
 
     except Exception as e:
-        error_msg = f"DeepSeek API error: {str(e)}"
+        error_msg = f"OpenRouter API error: {str(e)}"
         console.print(f"\n[bold red]❌ {error_msg}[/bold red]")
         return {"error": error_msg}
 
@@ -744,8 +754,8 @@ def stream_openai_response(user_message: str):
 
 def main():
     # Create a beautiful gradient-style welcome panel
-    welcome_text = """[bold bright_blue]🐋 DeepSeek Engineer[/bold bright_blue] [bright_cyan]with Function Calling[/bright_cyan]
-[dim blue]Powered by DeepSeek-R1 with Chain-of-Thought Reasoning[/dim blue]"""
+    welcome_text = """[bold bright_blue]🐋 Devstral Engineer[/bold bright_blue] [bright_cyan]with Function Calling[/bright_cyan]
+[dim blue]Powered by Devstral with Chain-of-Thought Reasoning[/dim blue]"""
     
     console.print(Panel.fit(
         welcome_text,
@@ -796,7 +806,7 @@ def main():
         if response_data.get("error"):
             console.print(f"[bold red]❌ Error: {response_data['error']}[/bold red]")
 
-    console.print("[bold blue]✨ Session finished. Thank you for using DeepSeek Engineer![/bold blue]")
+    console.print("[bold blue]✨ Session finished. Thank you for using Devstral Engineer![/bold blue]")
 
 if __name__ == "__main__":
     main()

@@ -1991,7 +1991,6 @@ async def stream_openai_response(user_message: str):
 
 
 async def main():
-    global engine_proc
 
     # Launch indexing engine subprocess
     launch_engine(ENGINE_PORT)

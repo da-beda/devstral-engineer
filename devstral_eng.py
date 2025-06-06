@@ -944,7 +944,8 @@ def show_diff_table(files_to_edit: List[FileToEdit]) -> None:
 def apply_diff_edit(path: str, original_snippet: str, new_snippet: str):
     """Reads the file at 'path', replaces the first occurrence of 'original_snippet' with 'new_snippet', then overwrites."""
     try:
-        content = read_local_file(path)
+        normalized_path = normalize_path(path)
+        content = read_local_file(normalized_path)
 
         # Verify we're replacing the exact intended occurrence
         occurrences = content.count(original_snippet)
@@ -969,25 +970,27 @@ def apply_diff_edit(path: str, original_snippet: str, new_snippet: str):
                 lineterm="",
             )
         )
-        console.print(Panel(diff, title=f"Diff for {path}", border_style="green"))
+        console.print(
+            Panel(diff, title=f"Diff for {normalized_path}", border_style="green")
+        )
 
         confirm = questionary.confirm("Apply this diff?", default=False).ask()
         if not confirm:
             console.print("[bold yellow]⚠ Diff edit skipped by user[/bold yellow]")
             return
 
-        create_file(path, updated_content)
+        create_file(normalized_path, updated_content)
         console.print(
-            f"[bold blue]✓[/bold blue] Applied diff edit to '[bright_cyan]{path}[/bright_cyan]'"
+            f"[bold blue]✓[/bold blue] Applied diff edit to '[bright_cyan]{normalized_path}[/bright_cyan]'"
         )
 
     except FileNotFoundError:
         console.print(
-            f"[bold red]✗[/bold red] File not found for diff editing: '[bright_cyan]{path}[/bright_cyan]'"
+            f"[bold red]✗[/bold red] File not found for diff editing: '[bright_cyan]{normalized_path}[/bright_cyan]'"
         )
     except ValueError as e:
         console.print(
-            f"[bold yellow]⚠[/bold yellow] {str(e)} in '[bright_cyan]{path}[/bright_cyan]'. No changes made."
+            f"[bold yellow]⚠[/bold yellow] {str(e)} in '[bright_cyan]{normalized_path}[/bright_cyan]'. No changes made."
         )
         console.print("\n[bold blue]Expected snippet:[/bold blue]")
         console.print(

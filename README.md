@@ -20,6 +20,7 @@ Devstral Engineer v2 is a powerful AI-powered coding assistant that provides an 
 - **Code Analysis & Discussion**: Expert-level insights and optimization suggestions
 - **Intelligent Problem Solving**: Automatic file reading and context understanding
 - **Built-in Web Search**: Fetch DuckDuckGo results on demand with `/search` or `/deep-research`
+- **Persistent Sessions**: Conversation history automatically saved between runs
 
 ### 🛠️ **Function Calling Tools**
 The AI can automatically execute these operations when needed:
@@ -229,6 +230,7 @@ You> Now review this codebase structure
 - **Smart conversation cleanup** to prevent token overflow
 - **File content preservation** across conversation history
 - **Tool message integration** for complete operation tracking
+- **Persistent history** stored in `~/.config/devstral-engineer/conversation_history.json`
 
 ### **Batch Operations**
 ```

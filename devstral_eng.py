@@ -1103,14 +1103,14 @@ def add_directory_to_conversation(directory_path: str):
             ".woff2",
             ".eot",
         }
-        skipped_files = []
-        added_files = []
-        total_files_processed = 0
+        skipped_files: List[str] = []
+        added_files: List[str] = []
+        eligible_files: List[str] = []
         max_files = 1000  # Reasonable limit for files to process
         max_file_size = 5_000_000  # 5MB limit
 
         for root, dirs, files in os.walk(directory_path):
-            if total_files_processed >= max_files:
+            if len(eligible_files) >= max_files:
                 console.print(
                     f"[bold yellow]⚠[/bold yellow] Reached maximum file limit ({max_files})"
                 )
@@ -1123,7 +1123,7 @@ def add_directory_to_conversation(directory_path: str):
             ]
 
             for file in files:
-                if total_files_processed >= max_files:
+                if len(eligible_files) >= max_files:
                     break
 
                 if file.startswith(".") or file in excluded_files:
@@ -1149,18 +1149,32 @@ def add_directory_to_conversation(directory_path: str):
                         continue
 
                     normalized_path = normalize_path(full_path)
-                    content = read_local_file(normalized_path)
-                    add_to_history(
-                        {
-                            "role": "system",
-                            "content": f"Content of file '{normalized_path}':\n\n{content}",
-                        }
-                    )
-                    added_files.append(normalized_path)
-                    total_files_processed += 1
+                    eligible_files.append(normalized_path)
 
                 except OSError:
                     skipped_files.append(full_path)
+
+        status.update("[bold bright_blue]📄 Reading files...[/bold bright_blue]")
+
+        async def _read_files(paths: List[str]):
+            tasks = [asyncio.to_thread(read_local_file, p) for p in paths]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            for path, result in zip(paths, results):
+                if isinstance(result, Exception):
+                    skipped_files.append(path)
+                else:
+                    add_to_history(
+                        {
+                            "role": "system",
+                            "content": f"Content of file '{path}':\n\n{result}",
+                        }
+                    )
+                    added_files.append(path)
+
+        if eligible_files:
+            asyncio.run(_read_files(eligible_files))
+
+        total_files_processed = len(added_files)
 
         console.print(
             f"[bold blue]✓[/bold blue] Added folder '[bright_cyan]{directory_path}[/bright_cyan]' to conversation."

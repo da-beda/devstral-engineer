@@ -1230,7 +1230,6 @@ def ensure_file_in_context(file_path: str) -> bool:
         )
         return False
 
-
 def normalize_path(path_str: str) -> str:
     """
     Return a canonical, absolute version of the path with security checks.
@@ -1241,11 +1240,11 @@ def normalize_path(path_str: str) -> str:
 
     Only after these validations does it resolve and return the absolute form.
     """
-    path = Path(path_str)
-
-    # 1) Disallow leading ~ or ~user
+    # 1) Disallow leading "~" or "~user"
     if path_str.startswith("~"):
         raise ValueError(f"Invalid path: {path_str!r} starts with '~'")
+
+    path = Path(path_str)
 
     # 2) Disallow any ".." component
     if ".." in path.parts:
@@ -1253,9 +1252,8 @@ def normalize_path(path_str: str) -> str:
             f"Invalid path: {path_str!r} contains parent‐directory reference '..'"
         )
 
-    # Now resolve against cwd
+    # Now resolve against cwd (and return an absolute path)
     return str(path.resolve())
-
 
 def undo_last_change(num_undos: int = 1):
     """Undo the most recent file creation or edit operations."""

@@ -51,7 +51,6 @@ PROFILE_DATA = {
     "_manage_context_window": {"calls": 0, "total": 0.0},
     "trim_conversation_history": {"calls": 0, "total": 0.0},
 }
-MODE = "ask"
 
 ENGINE_PORT = 8001
 engine_proc: subprocess.Popen | None = None
@@ -2025,7 +2024,6 @@ async def main():
   • [bright_cyan]/search your query[/bright_cyan] - Inject DuckDuckGo search results
   • [bright_cyan]/deep-research your query[/bright_cyan] - Fetch articles for in-depth research
   • [bright_cyan]/code-search your query[/bright_cyan] - Search indexed code
-  • [bright_cyan]/edit[/bright_cyan] or [bright_cyan]/ask[/bright_cyan] - Switch modes
   • Just ask naturally - the AI will handle file operations automatically!"""
 
     console.print(
@@ -2064,16 +2062,6 @@ async def main():
             print_help()
             continue
 
-        if user_input.lower() == "/edit":
-            global MODE
-            MODE = "edit"
-            console.print("[bold cyan]Switched to EDIT mode[/bold cyan]")
-            continue
-
-        if user_input.lower() == "/ask":
-            MODE = "ask"
-            console.print("[bold cyan]Switched to ASK mode[/bold cyan]")
-            continue
 
         if await try_handle_add_command(user_input):
             continue

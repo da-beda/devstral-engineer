@@ -12,3 +12,9 @@ aiohttp>=3.9.5
 beautifulsoup4>=4.12.3
 typer>=0.12.3
 questionary>=2.0.1
+
+pathspec>=0.12.1
+watchdog>=3.0.0
+fastapi>=0.110.0
+uvicorn>=0.29.0
+numpy>=1.26.0

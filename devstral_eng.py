@@ -1233,15 +1233,19 @@ def ensure_file_in_context(file_path: str) -> bool:
 
 def normalize_path(path_str: str) -> str:
     """Return a canonical, absolute version of the path with security checks."""
-    path = Path(path_str).resolve()
+    path = Path(path_str)
 
-    # Prevent directory traversal attacks
+    # Validate the raw input *before* resolving
+    if path_str.startswith("~"):
+        raise ValueError(f"Invalid path: {path_str} starts with '~'")
+
     if ".." in path.parts:
         raise ValueError(
             f"Invalid path: {path_str} contains parent directory references"
         )
 
-    return str(path)
+    resolved = (Path.cwd() / path).resolve()
+    return str(resolved)
 
 
 def undo_last_change(num_undos: int = 1):

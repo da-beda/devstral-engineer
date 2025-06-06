@@ -332,6 +332,7 @@ git clone <repository-url>
 cd devstral-engineer
 uv venv
 uv sync
+uv pip install pytest pytest-asyncio  # install test requirements
 ```
 
 ### **Run**

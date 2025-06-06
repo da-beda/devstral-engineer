@@ -1,15 +1,56 @@
-import requests
-from bs4 import BeautifulSoup
+import json
+import time
+from pathlib import Path
 from typing import List, Dict
 
+import requests
+from bs4 import BeautifulSoup
+
+CACHE_DIR = Path.home() / ".cache" / "devstral-engineer"
+CACHE_FILE = CACHE_DIR / "ddg_cache.json"
+CACHE_TTL_SECONDS = 24 * 60 * 60  # 24 hours
+
+
+def _load_cache() -> Dict[str, Dict[str, object]]:
+    if CACHE_FILE.exists():
+        try:
+            with CACHE_FILE.open("r") as f:
+                return json.load(f)
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_cache(cache: Dict[str, Dict[str, object]]) -> None:
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    with CACHE_FILE.open("w") as f:
+        json.dump(cache, f)
+
+
+def clear_ddg_cache() -> None:
+    """Remove the stored DuckDuckGo cache file."""
+    if CACHE_FILE.exists():
+        CACHE_FILE.unlink()
+
+
 def ddg_search(query: str, max_results: int = 5, region: str = "us-en") -> List[Dict[str, str]]:
-    """Perform a DuckDuckGo search via the HTML endpoint."""
-    url = "https://html.duckduckgo.com/html"
-    data = {"q": query, "kl": region, "kp": "-2"}
-    headers = {"User-Agent": "Mozilla/5.0 (Python) DevstralDDG/1.0"}
-    resp = requests.post(url, data=data, headers=headers, timeout=10)
-    resp.raise_for_status()
-    return parse_ddg_html(resp.text, max_results)
+    """Perform a DuckDuckGo search via the HTML endpoint with caching."""
+    cache = _load_cache()
+    key = f"{query}|{region}"
+    now = time.time()
+    entry = cache.get(key)
+    if entry and now - entry.get("timestamp", 0) < CACHE_TTL_SECONDS:
+        results = entry.get("results", [])
+    else:
+        url = "https://html.duckduckgo.com/html"
+        data = {"q": query, "kl": region, "kp": "-2"}
+        headers = {"User-Agent": "Mozilla/5.0 (Python) DevstralDDG/1.0"}
+        resp = requests.post(url, data=data, headers=headers, timeout=10)
+        resp.raise_for_status()
+        results = parse_ddg_html(resp.text, max_results)
+        cache[key] = {"timestamp": now, "results": results}
+        _save_cache(cache)
+    return results[:max_results]
 
 def parse_ddg_html(html: str, max_results: int) -> List[Dict[str, str]]:
     soup = BeautifulSoup(html, "html.parser")

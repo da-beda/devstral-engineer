@@ -27,6 +27,7 @@ from ddg_search import ddg_search, ddg_results_to_markdown
 
 # Deep research helper for multi-page scraping
 from ddg_deep import deep_research
+import asyncio
 
 try:
     import tiktoken
@@ -962,7 +963,7 @@ def try_handle_deep_command(user_input: str) -> bool:
         f"[bold blue]🔎 Starting Deep Research for:[/bold blue] '{query_terms}'"
     )
     try:
-        md_content = deep_research(query_terms)
+        md_content = asyncio.run(deep_research(query_terms))
         add_to_history({"role": "system", "content": md_content})
         console.print(
             Panel(

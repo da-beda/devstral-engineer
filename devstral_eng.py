@@ -1232,24 +1232,28 @@ def ensure_file_in_context(file_path: str) -> bool:
 
 
 def normalize_path(path_str: str) -> str:
-    """Return a canonical, absolute version of the path with security checks.
+    """
+    Return a canonical, absolute version of the path with security checks.
 
-    The function rejects any path containing parent-directory references
-    ("..") or starting with a home directory shortcut ("~" or "~user").
-    Only after these validations does it resolve the path and return the
-    absolute form.
+    This function rejects:
+      1) Any path that starts with "~" or "~user" (i.e. shell‐style home expansion).
+      2) Any path containing parent‐directory references ("..").
+
+    Only after these validations does it resolve and return the absolute form.
     """
     path = Path(path_str)
 
-    # Security checks before resolving the path
-    if any(part.startswith("~") for part in path.parts):
-        raise ValueError("Home directory references not allowed")
+    # 1) Disallow leading ~ or ~user
+    if path_str.startswith("~"):
+        raise ValueError(f"Invalid path: {path_str!r} starts with '~'")
 
+    # 2) Disallow any ".." component
     if ".." in path.parts:
         raise ValueError(
-            f"Invalid path: {path_str} contains parent directory references"
+            f"Invalid path: {path_str!r} contains parent‐directory reference '..'"
         )
 
+    # Now resolve against cwd
     return str(path.resolve())
 
 

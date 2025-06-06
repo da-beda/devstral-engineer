@@ -9,7 +9,7 @@ app = typer.Typer(help="Devstral Engineer CLI")
 def main(
     ctx: typer.Context,
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
-    debug: bool = typer.Option(False, "--debug", help="Debug output"),
+    debug: bool = typer.Option(False, "--debug", help="Debug output with profiling"),
 ) -> None:
     """Start interactive chat when no subcommand is provided."""
     if ctx.invoked_subcommand is None:

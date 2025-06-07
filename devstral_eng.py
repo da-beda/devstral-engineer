@@ -62,6 +62,8 @@ PROFILE_DATA = {
     "trim_conversation_history": {"calls": 0, "total": 0.0},
 }
 
+PRODUCT_COMMAND = "devstral"
+
 ENGINE_PORT = 8001
 engine_proc: subprocess.Popen | None = None
 index_client = IndexClient(f"http://127.0.0.1:{ENGINE_PORT}")
@@ -627,7 +629,7 @@ tools = [
 # 3. system prompt
 # --------------------------------------------------------------------------------
 system_PROMPT = dedent(
-    """\
+    f"""\
     You are an elite software engineer called Devstral Engineer with decades of experience across all programming domains.
     Your expertise spans system design, algorithms, testing, and best practices.
     You provide thoughtful, well-structured solutions while explaining your reasoning.
@@ -668,6 +670,7 @@ system_PROMPT = dedent(
     4. Follow language-specific best practices
     5. Suggest tests or validation steps when appropriate
     6. Be thorough in your analysis and recommendations
+    7. When users ask about CLI flags or commands, run '{PRODUCT_COMMAND} -h' using the run_bash function and share the output
 
     IMPORTANT: In your thinking process, if you realize that something requires a tool call, cut your thinking short and proceed directly to the tool call. Don't overthink - act efficiently when file operations are needed.
 

@@ -5,6 +5,7 @@ from conversation_store import (
     save_history,
     display_history,
     clear_history,
+    search_history,
 )
 
 
@@ -43,3 +44,16 @@ def test_corrupt_file_logs_warning(tmp_path, monkeypatch, caplog):
     assert any(
         "Failed to parse conversation history" in rec.message for rec in caplog.records
     )
+
+
+def test_search_history(tmp_path, monkeypatch):
+    file = tmp_path / "hist.json"
+    monkeypatch.setattr("conversation_store.HISTORY_FILE", file)
+    sample = [
+        {"role": "user", "content": "Hello there"},
+        {"role": "assistant", "content": "Hi"},
+        {"role": "user", "content": "Something else"},
+    ]
+    save_history(sample)
+    assert search_history("hello") == [sample[0]]
+    assert search_history("nothing") == []

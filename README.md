@@ -354,6 +354,7 @@ devstral
 ```bash
 devstral history        # show saved conversation
 devstral clear-history  # remove saved conversation
+devstral history-search <term>  # search saved conversation
 ```
 
 ### Index Engine Commands

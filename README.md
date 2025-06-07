@@ -350,6 +350,10 @@ or
 ```bash
 devstral
 ```
+When the chat starts you'll see a short environment summary showing the working
+directory, git status, platform, date and the default model. Keep your answers
+succinct (under four lines when possible) and run `devstral -h` at any time to
+view all CLI commands.
 
 ### History Commands
 ```bash
@@ -357,6 +361,13 @@ devstral history        # show saved conversation
 devstral clear-history  # remove saved conversation
 devstral history-search <term>  # search saved conversation
 ```
+
+### DEVSTRAL.md
+The assistant can record build or test commands and style notes in a
+`DEVSTRAL.md` file within your project. Approving prompts from functions like
+`record_build_command`, `record_test_command`, or `record_style_note` will append
+bulleted entries to this file so you have a handy reference for common tasks and
+guidelines.
 
 ### Index Engine Commands
 The code indexing engine is only started when `indexing_enabled` is `true` in

@@ -1359,16 +1359,37 @@ async def add_directory_to_conversation(directory_path: str):
 
 
 def is_binary_file(file_path: str, peek_size: int = 1024) -> bool:
+    """Heuristically determine if ``file_path`` is a binary file."""
     try:
         with open(file_path, "rb") as f:
             chunk = f.read(peek_size)
 
-        # Attempt UTF-8 decoding first
-        if chunk.decode("utf-8", errors="ignore").strip():
+        if not chunk:
             return False
 
+        # UTF-16/UTF-32 BOM detection
+        if chunk.startswith((b"\xff\xfe", b"\xfe\xff", b"\xff\xfe\x00\x00", b"\x00\x00\xfe\xff")):
+            try:
+                chunk.decode("utf-16")
+                return False
+            except Exception:
+                pass
+
+        # Attempt strict UTF-8 decoding
+        try:
+            chunk.decode("utf-8")
+            return False
+        except UnicodeDecodeError:
+            pass
+
         # Fallback to null byte detection
-        return b"\0" in chunk
+        if b"\0" in chunk:
+            return True
+
+        # Presence of high-bit or control characters is a good hint of binary
+        text_chars = bytearray({7, 8, 9, 10, 12, 13, 27} | set(range(0x20, 0x7F)))
+        non_text = chunk.translate(None, text_chars)
+        return bool(non_text)
     except Exception:
         # If we fail to read, just treat it as binary to be safe
         return True

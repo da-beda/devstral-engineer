@@ -28,6 +28,8 @@ class _Handler(FileSystemEventHandler):
 
     def _handle(self, path_str: str):
         path = Path(path_str)
+        if path.is_symlink():
+            return
         if path.suffix in SUPPORTED_EXTENSIONS and path.is_file():
             rel = path.relative_to(self.scanner.root)
             if self.scanner.spec.match_file(str(rel)):

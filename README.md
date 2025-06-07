@@ -129,21 +129,10 @@ For when you want to preload files into conversation context:
    ```
 
 2. **Set up configuration**:
-   ```bash
-   mkdir -p ~/.config/devstral-engineer
-   cat > ~/.config/devstral-engineer/config.yaml <<'EOF'
-   api_key: your_api_key_here
-   default_model: mistralai/devstral-small:free
-   indexing_enabled: true
-   index_engine_path: /path/to/code-index-engine
-   qdrant_url: http://localhost:6333
-   qdrant_api_key: your_qdrant_api_key
-    embedding:
-      provider: openai
-      model: text-embedding-3-small
-      api_key: your_openai_key
-    EOF
-    ```
+   The CLI will run an interactive onboarding wizard on first launch, prompting
+   for your API key, default model and a color theme. The resulting file is
+   saved to `~/.config/devstral-engineer/config.yaml`. You can re-run this wizard
+   manually with `devstral onboard`.
 
    **Configuration options**:
    - `indexing_enabled`: enable the local code indexing engine. When set to
@@ -159,15 +148,13 @@ For when you want to preload files into conversation context:
    #### Using uv (recommended - faster)
    ```bash
    uv venv
-   uv run -m devstral_cli setup  # create config interactively
-   uv run -m devstral_cli        # start chatting
+   uv run -m devstral_cli  # onboarding runs automatically
    ```
 
     #### Using pip
     ```bash
     pip install -r requirements.txt
-    devstral setup  # one-time configuration
-    devstral        # start the chat
+    devstral  # onboarding runs automatically
     ```
 
     > **Important**: Run `uv sync` or `pip install -r requirements.txt` to ensure FastAPI and Pydantic are installed together without version mismatches.

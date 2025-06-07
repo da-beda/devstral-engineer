@@ -364,6 +364,15 @@ devstral index-status   # check if the indexing engine is running
 devstral index-clear    # release the current code index
 ```
 
+### High-Performance Local Indexing
+
+You can run the indexing engine entirely offline using **Qdrant** with an
+ONNX‑based embedding service. Set `qdrant_url` and `qdrant_api_key` in your
+configuration and provide an ONNX model path via `embedding.model`. The engine
+monitors your workspace with filesystem events, re‑embedding only changed files
+and upserting them into a Qdrant HNSW collection. For huge repos you can combine
+Qdrant's payload filters or a small BM25 layer as a fast first pass.
+
 ### Debug Profiling
 Run with `--debug` to see timing information for context management:
 ```bash

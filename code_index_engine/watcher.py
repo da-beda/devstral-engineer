@@ -2,6 +2,7 @@ from pathlib import Path
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from .scanner import WorkspaceScanner, SUPPORTED_EXTENSIONS, IndexedBlock
+from .embeddings import embed_text
 
 
 class _Handler(FileSystemEventHandler):
@@ -18,12 +19,16 @@ class _Handler(FileSystemEventHandler):
         path = Path(str(event.src_path))
         if path in self.scanner.index:
             del self.scanner.index[path]
+        if self.scanner.vector_store:
+            self.scanner.vector_store.delete(str(path))
 
     def on_moved(self, event):
         src = Path(str(event.src_path))
         _dest = Path(str(event.dest_path))
         if src in self.scanner.index:
             del self.scanner.index[src]
+        if self.scanner.vector_store:
+            self.scanner.vector_store.delete(str(src))
         self._handle(str(event.dest_path))
 
     def _handle(self, path_str: str):
@@ -39,9 +44,10 @@ class _Handler(FileSystemEventHandler):
                 path not in self.scanner.index
                 or self.scanner.index[path].content != text
             ):
-                from .embeddings import embed_text
-
-                self.scanner.index[path] = IndexedBlock(path, text, embed_text(text))
+                emb = embed_text(text)
+                self.scanner.index[path] = IndexedBlock(path, text, emb)
+                if self.scanner.vector_store:
+                    self.scanner.vector_store.upsert(str(path), emb, {"path": str(path)})
 
 
 class WorkspaceWatcher:

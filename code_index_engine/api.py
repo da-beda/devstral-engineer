@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from pathlib import Path
 from .scanner import WorkspaceScanner
 from .watcher import WorkspaceWatcher
+from .qdrant_store import QdrantStore
 
 app = FastAPI()
 
@@ -12,6 +13,8 @@ watcher: WorkspaceWatcher | None = None
 
 class StartRequest(BaseModel):
     path: str
+    qdrant_url: str | None = None
+    qdrant_api_key: str | None = None
 
 
 class SearchRequest(BaseModel):
@@ -25,7 +28,13 @@ def start(req: StartRequest):
     root = Path(req.path)
     if not root.exists():
         raise HTTPException(status_code=404, detail="Path not found")
-    scanner = WorkspaceScanner(root)
+    vs = None
+    if req.qdrant_url:
+        try:
+            vs = QdrantStore(req.qdrant_url, req.qdrant_api_key)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=str(exc))
+    scanner = WorkspaceScanner(root, vector_store=vs)
     scanner.scan()
     watcher = WorkspaceWatcher(scanner)
     watcher.start()

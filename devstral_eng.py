@@ -108,7 +108,13 @@ def launch_engine(port: int = ENGINE_PORT, debug: bool = False) -> None:
         except Exception:
             time.sleep(0.5)
     try:
-        asyncio.run(index_client.start(str(Path.cwd())))
+        asyncio.run(
+            index_client.start(
+                str(Path.cwd()),
+                config.qdrant_url,
+                config.qdrant_api_key,
+            )
+        )
     except Exception:
         pass
 

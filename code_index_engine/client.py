@@ -8,10 +8,20 @@ class IndexClient:
     def __init__(self, base_url: str = "http://127.0.0.1:8001"):
         self.base_url = base_url.rstrip("/")
 
-    async def start(self, path: str) -> Any:
+    async def start(
+        self,
+        path: str,
+        qdrant_url: str | None = None,
+        qdrant_api_key: str | None = None,
+    ) -> Any:
+        payload = {"path": path}
+        if qdrant_url:
+            payload["qdrant_url"] = qdrant_url
+        if qdrant_api_key:
+            payload["qdrant_api_key"] = qdrant_api_key
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"{self.base_url}/start", json={"path": path}
+                f"{self.base_url}/start", json=payload
             ) as resp:
                 resp.raise_for_status()
                 return await resp.json()

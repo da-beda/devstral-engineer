@@ -1366,10 +1366,13 @@ def is_binary_file(file_path: str, peek_size: int = 1024) -> bool:
     try:
         with open(file_path, "rb") as f:
             chunk = f.read(peek_size)
-        # If there is a null byte in the sample, treat it as binary
-        if b"\0" in chunk:
-            return True
-        return False
+
+        # Attempt UTF-8 decoding first
+        if chunk.decode("utf-8", errors="ignore").strip():
+            return False
+
+        # Fallback to null byte detection
+        return b"\0" in chunk
     except Exception:
         # If we fail to read, just treat it as binary to be safe
         return True

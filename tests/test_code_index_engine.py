@@ -45,3 +45,44 @@ def test_watcher_handles_rename(tmp_path):
         assert f not in scanner.index
     finally:
         watcher.stop()
+
+
+def test_scanner_ignores_symlink_file(tmp_path):
+    target = tmp_path / "real.py"
+    target.write_text("print('hi')")
+    link = tmp_path / "link.py"
+    link.symlink_to(target)
+    scanner = WorkspaceScanner(tmp_path)
+    scanner.scan()
+    assert target in scanner.index
+    assert link not in scanner.index
+
+
+def test_scanner_ignores_symlink_directory(tmp_path):
+    real = tmp_path / "dir"
+    real.mkdir()
+    f = real / "a.py"
+    f.write_text("x = 1")
+    linkdir = tmp_path / "symdir"
+    linkdir.symlink_to(real, target_is_directory=True)
+    scanner = WorkspaceScanner(tmp_path)
+    scanner.scan()
+    assert f in scanner.index
+    assert linkdir not in scanner.index
+    assert not any(p.is_relative_to(linkdir) for p in scanner.index)
+
+
+def test_watcher_ignores_symlink(tmp_path):
+    target = tmp_path / "real.py"
+    target.write_text("print('hi')")
+    scanner = WorkspaceScanner(tmp_path)
+    scanner.scan()
+    watcher = WorkspaceWatcher(scanner)
+    watcher.start()
+    try:
+        link = tmp_path / "link.py"
+        link.symlink_to(target)
+        time.sleep(0.5)
+        assert link not in scanner.index
+    finally:
+        watcher.stop()

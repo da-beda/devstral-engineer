@@ -42,6 +42,8 @@ class WorkspaceScanner:
 
     def scan(self):
         for file in self.root.rglob("*"):
+            if file.is_symlink():
+                continue
             if file.is_file() and file.suffix in SUPPORTED_EXTENSIONS:
                 rel = file.relative_to(self.root)
                 if self.spec.match_file(str(rel)):

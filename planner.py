@@ -3,6 +3,9 @@ from typing import List, Dict, Any, Optional
 from textwrap import dedent
 
 from openai import AsyncOpenAI
+import time
+
+from cost_tracker import add_cost, calculate_cost
 
 from config import Config
 
@@ -41,12 +44,17 @@ async def plan_steps(
     ]
 
     try:
+        start = time.perf_counter()
         resp = await client_to_use.chat.completions.create(
             model=model,
             messages=messages,
             tools=tools,
             response_format={"type": "json_object"},
         )
+        duration = time.perf_counter() - start
+        cost = calculate_cost(model, getattr(resp, "usage", {}))
+        add_cost(cost, duration)
+
         content = resp.choices[0].message.content
         data = json.loads(content)
         plan = data.get("plan", [])

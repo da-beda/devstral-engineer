@@ -181,6 +181,8 @@ console = Console()
 COMMAND_HISTORY_FILE = CONFIG_DIR / "command_history.txt"
 COMMAND_HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
 
+PROJECT_FILE = "DEVSTRAL.md"
+
 prompt_session = PromptSession(
     completer=SlashCommandCompleter(),
     history=FileHistory(str(COMMAND_HISTORY_FILE)),
@@ -623,6 +625,48 @@ tools = [
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "record_build_command",
+            "description": "Append a build command to DEVSTRAL.md",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "Build command"}
+                },
+                "required": ["command"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "record_test_command",
+            "description": "Append a test command to DEVSTRAL.md",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "command": {"type": "string", "description": "Test command"}
+                },
+                "required": ["command"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "record_style_note",
+            "description": "Append a style note to DEVSTRAL.md",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "note": {"type": "string", "description": "Style guidance"}
+                },
+                "required": ["note"],
+            },
+        },
+    },
 ]
 
 # --------------------------------------------------------------------------------
@@ -949,6 +993,55 @@ def manage_dependency(action: str, package: str) -> str:
         return "Error: action must be 'install' or 'uninstall'"
     cmd = f"pip {action} {shlex.quote(package)}"
     return run_bash(cmd)
+
+
+def _append_project_note(text: str) -> None:
+    path = Path(PROJECT_FILE)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as f:
+        f.write(text.rstrip() + "\n")
+
+
+def record_build_command(command: str) -> str:
+    """Record a build command in the project file if approved by the user."""
+    confirm = questionary.confirm(
+        f"Record build command `{command}` to {PROJECT_FILE}?", default=False
+    ).ask()
+    if not confirm:
+        return "Recording build command skipped"
+    try:
+        _append_project_note(f"- **Build:** `{command}`")
+        return "Recorded build command"
+    except Exception as exc:  # pragma: no cover - file write edge
+        return f"Error recording build command: {exc}"
+
+
+def record_test_command(command: str) -> str:
+    """Record a test command in the project file if approved by the user."""
+    confirm = questionary.confirm(
+        f"Record test command `{command}` to {PROJECT_FILE}?", default=False
+    ).ask()
+    if not confirm:
+        return "Recording test command skipped"
+    try:
+        _append_project_note(f"- **Test:** `{command}`")
+        return "Recorded test command"
+    except Exception as exc:  # pragma: no cover - file write edge
+        return f"Error recording test command: {exc}"
+
+
+def record_style_note(note: str) -> str:
+    """Record style notes in the project file if approved by the user."""
+    confirm = questionary.confirm(
+        f"Record style note to {PROJECT_FILE}?", default=False
+    ).ask()
+    if not confirm:
+        return "Recording style note skipped"
+    try:
+        _append_project_note(f"- **Style Note:** {note}")
+        return "Recorded style note"
+    except Exception as exc:  # pragma: no cover - file write edge
+        return f"Error recording style note: {exc}"
 
 
 def get_git_summary() -> str:
@@ -1591,6 +1684,17 @@ if not conversation_history:
     conversation_history = [{"role": "system", "content": system_PROMPT}]
     save_history(conversation_history)
 
+proj_path = Path.cwd() / PROJECT_FILE
+if proj_path.exists():
+    try:
+        proj_content = proj_path.read_text(encoding="utf-8")
+        marker = f"Content of '{PROJECT_FILE}'"
+        if not any(marker in msg.get("content", "") for msg in conversation_history):
+            conversation_history.append({"role": "system", "content": f"{marker}:\n\n{proj_content}"})
+            save_history(conversation_history)
+    except Exception as exc:  # pragma: no cover - startup warning
+        console.print(f"[{THEME.error}]✗ Failed to read {PROJECT_FILE}: {exc}[/{THEME.error}]")
+
 
 def _manage_context_window(
     token_limit: int = 64000, reserve_tokens: int = 1000
@@ -1815,6 +1919,18 @@ async def _execute_tool(function_name: str, arguments: Dict[str, Any]) -> str:
         action = arguments["action"]
         package = arguments["package"]
         return manage_dependency(action, package)
+
+    elif function_name == "record_build_command":
+        cmd = arguments["command"]
+        return record_build_command(cmd)
+
+    elif function_name == "record_test_command":
+        cmd = arguments["command"]
+        return record_test_command(cmd)
+
+    elif function_name == "record_style_note":
+        note = arguments["note"]
+        return record_style_note(note)
 
     elif function_name == "search_code":
         query = arguments["query"]

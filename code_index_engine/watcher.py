@@ -9,22 +9,22 @@ class _Handler(FileSystemEventHandler):
         self.scanner = scanner
 
     def on_created(self, event):
-        self._handle(event.src_path)
+        self._handle(str(event.src_path))
 
     def on_modified(self, event):
-        self._handle(event.src_path)
+        self._handle(str(event.src_path))
 
     def on_deleted(self, event):
-        path = Path(event.src_path)
+        path = Path(str(event.src_path))
         if path in self.scanner.index:
             del self.scanner.index[path]
 
     def on_moved(self, event):
-        src = Path(event.src_path)
-        dest = Path(event.dest_path)
+        src = Path(str(event.src_path))
+        _dest = Path(str(event.dest_path))
         if src in self.scanner.index:
             del self.scanner.index[src]
-        self._handle(dest)
+        self._handle(str(event.dest_path))
 
     def _handle(self, path_str: str):
         path = Path(path_str)

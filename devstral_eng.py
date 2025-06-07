@@ -1565,142 +1565,146 @@ def print_profiling_stats() -> None:
 # --------------------------------------------------------------------------------
 
 
+async def _execute_tool(function_name: str, arguments: Dict[str, Any]) -> str:
+    """Dispatch execution for a single tool call."""
+    if function_name == "read_file":
+        file_path = arguments["file_path"]
+        normalized_path = normalize_path(file_path)
+        content = read_local_file(normalized_path)
+        return f"Content of file '{normalized_path}':\n\n{content}"
+
+    elif function_name == "read_multiple_files":
+        file_paths = arguments["file_paths"]
+        results = []
+        for file_path in file_paths:
+            try:
+                normalized_path = normalize_path(file_path)
+                content = read_local_file(normalized_path)
+                results.append(f"Content of file '{normalized_path}':\n\n{content}")
+            except OSError as e:
+                results.append(f"Error reading '{file_path}': {e}")
+        return "\n\n" + "=" * 50 + "\n\n".join(results)
+
+    elif function_name == "view":
+        file_path = arguments["file_path"]
+        offset = arguments.get("offset", 0)
+        limit = arguments.get("limit", 40)
+        return await view(file_path, offset, limit)
+
+    elif function_name == "create_file":
+        file_path = arguments["file_path"]
+        content = arguments["content"]
+        create_file(file_path, content)
+        return f"Successfully created file '{normalize_path(file_path)}'"
+
+    elif function_name == "create_multiple_files":
+        files = arguments["files"]
+        created_files = []
+        for file_info in files:
+            p = normalize_path(file_info["path"])
+            create_file(p, file_info["content"])
+            created_files.append(p)
+        return f"Successfully created {len(created_files)} files: {', '.join(created_files)}"
+
+    elif function_name == "edit_file":
+        file_path = arguments["file_path"]
+        original_snippet = arguments["original_snippet"]
+        new_snippet = arguments["new_snippet"]
+
+        # Ensure file is in context first
+        if not ensure_file_in_context(file_path):
+            return f"Error: Could not read file '{file_path}' for editing"
+
+        apply_diff_edit(file_path, original_snippet, new_snippet)
+        return f"Successfully edited file '{file_path}'"
+
+    elif function_name == "linter_checker":
+        path = arguments.get("path", ".")
+        cmd = arguments.get("linter_command", "ruff check")
+        return linter_checker(path, cmd)
+
+    elif function_name == "formatter":
+        path = arguments.get("path", ".")
+        cmd = arguments.get("formatter_command", "black")
+        return formatter(path, cmd)
+
+    elif function_name == "grep":
+        pattern = arguments["pattern"]
+        file_path = arguments["file_path"]
+        ignore = arguments.get("ignore_case", False)
+        return grep(pattern, file_path, ignore)
+
+    elif function_name == "glob":
+        pattern = arguments["pattern"]
+        cwd = arguments.get("cwd", ".")
+        return glob(pattern, cwd)
+
+    elif function_name == "list_directory":
+        path = arguments.get("path", ".")
+        return list_directory(path)
+
+    elif function_name == "create_directory":
+        dir_path = arguments["dir_path"]
+        return create_directory(dir_path)
+
+    elif function_name == "run_bash":
+        command = arguments["command"]
+        timeout = arguments.get("timeout_ms", 30000)
+        return run_bash(command, timeout)
+
+    elif function_name == "tree_view":
+        path = arguments.get("path", ".")
+        depth = arguments.get("depth", 2)
+        return tree_view(path, depth)
+
+    elif function_name == "run_tests":
+        test_path = arguments.get("test_path")
+        options = arguments.get("options")
+        return run_tests(test_path, options)
+
+    elif function_name == "summarize_code":
+        file_path = arguments["file_path"]
+        return await summarize_code(file_path)
+
+    elif function_name == "git_status":
+        return git_status()
+
+    elif function_name == "git_diff":
+        path = arguments.get("path")
+        return git_diff(path)
+
+    elif function_name == "git_log":
+        n = arguments.get("n", 5)
+        return git_log(n)
+
+    elif function_name == "git_add":
+        path = arguments["path"]
+        return git_add(path)
+
+    elif function_name == "run_build":
+        cmd = arguments["command"]
+        return run_build(cmd)
+
+    elif function_name == "manage_dependency":
+        action = arguments["action"]
+        package = arguments["package"]
+        return manage_dependency(action, package)
+
+    elif function_name == "search_code":
+        query = arguments["query"]
+        prefix = arguments.get("directory_prefix")
+        return await search_code(query, prefix)
+
+    else:
+        return f"Unknown function: {function_name}"
+
+
 async def execute_function_call_dict(tool_call_dict) -> str:
     """Execute a function call from a dictionary format and return the result as a string."""
     try:
         function_name = tool_call_dict["function"]["name"]
         arguments = json.loads(tool_call_dict["function"]["arguments"])
-
-        if function_name == "read_file":
-            file_path = arguments["file_path"]
-            normalized_path = normalize_path(file_path)
-            content = read_local_file(normalized_path)
-            return f"Content of file '{normalized_path}':\n\n{content}"
-
-        elif function_name == "read_multiple_files":
-            file_paths = arguments["file_paths"]
-            results = []
-            for file_path in file_paths:
-                try:
-                    normalized_path = normalize_path(file_path)
-                    content = read_local_file(normalized_path)
-                    results.append(f"Content of file '{normalized_path}':\n\n{content}")
-                except OSError as e:
-                    results.append(f"Error reading '{file_path}': {e}")
-            return "\n\n" + "=" * 50 + "\n\n".join(results)
-
-        elif function_name == "view":
-            file_path = arguments["file_path"]
-            offset = arguments.get("offset", 0)
-            limit = arguments.get("limit", 40)
-            return await view(file_path, offset, limit)
-
-        elif function_name == "create_file":
-            file_path = arguments["file_path"]
-            content = arguments["content"]
-            create_file(file_path, content)
-            return f"Successfully created file '{normalize_path(file_path)}'"
-
-        elif function_name == "create_multiple_files":
-            files = arguments["files"]
-            created_files = []
-            for file_info in files:
-                p = normalize_path(file_info["path"])
-                create_file(p, file_info["content"])
-                created_files.append(p)
-            return f"Successfully created {len(created_files)} files: {', '.join(created_files)}"
-
-        elif function_name == "edit_file":
-            file_path = arguments["file_path"]
-            original_snippet = arguments["original_snippet"]
-            new_snippet = arguments["new_snippet"]
-
-            # Ensure file is in context first
-            if not ensure_file_in_context(file_path):
-                return f"Error: Could not read file '{file_path}' for editing"
-
-            apply_diff_edit(file_path, original_snippet, new_snippet)
-            return f"Successfully edited file '{file_path}'"
-
-        elif function_name == "linter_checker":
-            path = arguments.get("path", ".")
-            cmd = arguments.get("linter_command", "ruff check")
-            return linter_checker(path, cmd)
-
-        elif function_name == "formatter":
-            path = arguments.get("path", ".")
-            cmd = arguments.get("formatter_command", "black")
-            return formatter(path, cmd)
-
-        elif function_name == "grep":
-            pattern = arguments["pattern"]
-            file_path = arguments["file_path"]
-            ignore = arguments.get("ignore_case", False)
-            return grep(pattern, file_path, ignore)
-
-        elif function_name == "glob":
-            pattern = arguments["pattern"]
-            cwd = arguments.get("cwd", ".")
-            return glob(pattern, cwd)
-
-        elif function_name == "list_directory":
-            path = arguments.get("path", ".")
-            return list_directory(path)
-
-        elif function_name == "create_directory":
-            dir_path = arguments["dir_path"]
-            return create_directory(dir_path)
-
-        elif function_name == "run_bash":
-            command = arguments["command"]
-            timeout = arguments.get("timeout_ms", 30000)
-            return run_bash(command, timeout)
-
-        elif function_name == "tree_view":
-            path = arguments.get("path", ".")
-            depth = arguments.get("depth", 2)
-            return tree_view(path, depth)
-
-        elif function_name == "run_tests":
-            test_path = arguments.get("test_path")
-            options = arguments.get("options")
-            return run_tests(test_path, options)
-
-        elif function_name == "summarize_code":
-            file_path = arguments["file_path"]
-            return await summarize_code(file_path)
-
-        elif function_name == "git_status":
-            return git_status()
-
-        elif function_name == "git_diff":
-            path = arguments.get("path")
-            return git_diff(path)
-
-        elif function_name == "git_log":
-            n = arguments.get("n", 5)
-            return git_log(n)
-
-        elif function_name == "git_add":
-            path = arguments["path"]
-            return git_add(path)
-
-        elif function_name == "run_build":
-            cmd = arguments["command"]
-            return run_build(cmd)
-
-        elif function_name == "manage_dependency":
-            action = arguments["action"]
-            package = arguments["package"]
-            return manage_dependency(action, package)
-
-        elif function_name == "search_code":
-            query = arguments["query"]
-            prefix = arguments.get("directory_prefix")
-            return await search_code(query, prefix)
-
-        else:
-            return f"Unknown function: {function_name}"
+        return await _execute_tool(function_name, arguments)
 
     except Exception as e:
         return f"Error executing {function_name}: {str(e)}"
@@ -1711,65 +1715,7 @@ async def execute_function_call(tool_call) -> str:
     try:
         function_name = tool_call.function.name
         arguments = json.loads(tool_call.function.arguments)
-
-        if function_name == "read_file":
-            file_path = arguments["file_path"]
-            normalized_path = normalize_path(file_path)
-            content = read_local_file(normalized_path)
-            return f"Content of file '{normalized_path}':\n\n{content}"
-
-        elif function_name == "read_multiple_files":
-            file_paths = arguments["file_paths"]
-            results = []
-            for file_path in file_paths:
-                try:
-                    normalized_path = normalize_path(file_path)
-                    content = read_local_file(normalized_path)
-                    results.append(f"Content of file '{normalized_path}':\n\n{content}")
-                except OSError as e:
-                    results.append(f"Error reading '{file_path}': {e}")
-            return "\n\n" + "=" * 50 + "\n\n".join(results)
-
-        elif function_name == "view":
-            file_path = arguments["file_path"]
-            offset = arguments.get("offset", 0)
-            limit = arguments.get("limit", 40)
-            return await view(file_path, offset, limit)
-
-        elif function_name == "create_file":
-            file_path = arguments["file_path"]
-            content = arguments["content"]
-            create_file(file_path, content)
-            return f"Successfully created file '{normalize_path(file_path)}'"
-
-        elif function_name == "create_multiple_files":
-            files = arguments["files"]
-            created_files = []
-            for file_info in files:
-                p = normalize_path(file_info["path"])
-                create_file(p, file_info["content"])
-                created_files.append(p)
-            return f"Successfully created {len(created_files)} files: {', '.join(created_files)}"
-
-        elif function_name == "edit_file":
-            file_path = arguments["file_path"]
-            original_snippet = arguments["original_snippet"]
-            new_snippet = arguments["new_snippet"]
-
-            # Ensure file is in context first
-            if not ensure_file_in_context(file_path):
-                return f"Error: Could not read file '{file_path}' for editing"
-
-            apply_diff_edit(file_path, original_snippet, new_snippet)
-            return f"Successfully edited file '{file_path}'"
-
-        elif function_name == "search_code":
-            query = arguments["query"]
-            prefix = arguments.get("directory_prefix")
-            return await search_code(query, prefix)
-
-        else:
-            return f"Unknown function: {function_name}"
+        return await _execute_tool(function_name, arguments)
 
     except Exception as e:
         return f"Error executing {function_name}: {str(e)}"

@@ -26,6 +26,11 @@ def main(
         "--debug",
         help="Debug output with profiling and engine logs",
     ),
+    tui: bool = typer.Option(
+        False,
+        "--tui",
+        help="Start the experimental Textual interface",
+    ),
     no_index: bool = typer.Option(
         False,
         "--no-index",
@@ -34,7 +39,12 @@ def main(
 ) -> None:
     """Start interactive chat when no subcommand is provided."""
     if ctx.invoked_subcommand is None:
-        chat(verbose=verbose, debug=debug, no_index=no_index)
+        if tui:
+            from .tui import run_tui
+
+            run_tui(verbose=verbose, debug=debug, no_index=no_index)
+        else:
+            chat(verbose=verbose, debug=debug, no_index=no_index)
 
 
 @app.command()

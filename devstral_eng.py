@@ -33,7 +33,6 @@ import time
 import argparse
 import difflib
 from cost_tracker import add_cost, calculate_cost, format_cost_summary
-import platform
 from datetime import datetime
 
 # DuckDuckGo helper for on-demand web search

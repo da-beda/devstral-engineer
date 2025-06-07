@@ -353,6 +353,12 @@ devstral history        # show saved conversation
 devstral clear-history  # remove saved conversation
 ```
 
+### Index Engine Commands
+```bash
+devstral index-status   # check if the indexing engine is running
+devstral index-clear    # release the current code index
+```
+
 ### Debug Profiling
 Run with `--debug` to see timing information for context management:
 ```bash

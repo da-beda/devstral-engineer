@@ -105,3 +105,18 @@ def index_status() -> None:
 
     res = asyncio.run(_run())
     typer.echo(res.get("status", "unknown"))
+
+
+@app.command("index-clear")
+def index_clear() -> None:
+    """Release the current code index."""
+    from code_index_engine.client import IndexClient
+    import asyncio
+
+    client = IndexClient()
+
+    async def _run():
+        return await client.clear()
+
+    res = asyncio.run(_run())
+    typer.echo(res.get("status", "unknown"))

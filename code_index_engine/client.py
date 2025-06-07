@@ -22,6 +22,12 @@ class IndexClient:
                 resp.raise_for_status()
                 return await resp.json()
 
+    async def clear(self) -> Any:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(f"{self.base_url}/clear") as resp:
+                resp.raise_for_status()
+                return await resp.json()
+
     async def search(self, query: str, top_k: int = 5) -> List[dict]:
         async with aiohttp.ClientSession() as session:
             async with session.post(

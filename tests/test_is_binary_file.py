@@ -1,4 +1,5 @@
 import os
+
 os.environ.setdefault("OPENAI_API_KEY", "test")
 
 from devstral_eng import is_binary_file

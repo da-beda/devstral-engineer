@@ -33,7 +33,10 @@ class _Handler(FileSystemEventHandler):
             if self.scanner.spec.match_file(str(rel)):
                 return
             text = path.read_text(errors="ignore")
-            if path not in self.scanner.index or self.scanner.index[path].content != text:
+            if (
+                path not in self.scanner.index
+                or self.scanner.index[path].content != text
+            ):
                 from .embeddings import embed_text
 
                 self.scanner.index[path] = IndexedBlock(path, text, embed_text(text))

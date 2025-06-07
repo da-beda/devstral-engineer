@@ -131,7 +131,9 @@ async def test_fetch_ddg_page_returns_none_on_error(monkeypatch):
         def post(self, *args, **kwargs):
             return FailResponse()
 
-    monkeypatch.setattr(ddg_deep.aiohttp, "ClientSession", lambda *a, **kw: FailSession())
+    monkeypatch.setattr(
+        ddg_deep.aiohttp, "ClientSession", lambda *a, **kw: FailSession()
+    )
 
     result = await ddg_deep.fetch_ddg_page("query")
     assert result is None

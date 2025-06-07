@@ -1,6 +1,6 @@
 import json
 import typer
-from config import Config, CONFIG_FILE
+from config import Config, CONFIG_FILE, ThemeConfig
 from ddg_search import clear_ddg_cache
 from conversation_store import display_history, clear_history, search_history
 from .chat import chat
@@ -70,6 +70,20 @@ def set_default_model(model: str) -> None:
     cfg.default_model = model
     cfg.save()
     typer.echo(f"Default model set to {model}")
+
+
+@app.command("set-theme")
+def set_theme(
+    success: str = typer.Option(..., prompt=True, help="Style for success messages"),
+    error: str = typer.Option(..., prompt=True, help="Style for error messages"),
+    warning: str = typer.Option(..., prompt=True, help="Style for warnings"),
+    panel: str = typer.Option(..., prompt=True, help="Border style for panels"),
+) -> None:
+    """Customize terminal color theme."""
+    cfg = Config.load()
+    cfg.theme = ThemeConfig(success=success, error=error, warning=warning, panel=panel)
+    cfg.save()
+    typer.echo("Theme updated.")
 
 
 @app.command("clear-cache")

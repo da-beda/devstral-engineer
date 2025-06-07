@@ -32,6 +32,7 @@ from prompt_toolkit.history import FileHistory
 import time
 import argparse
 import difflib
+from cost_tracker import add_cost, calculate_cost, format_cost_summary
 
 # DuckDuckGo helper for on-demand web search
 from ddg_search import async_ddg_search, ddg_results_to_markdown
@@ -1904,6 +1905,7 @@ async def stream_openai_response(user_message: str):
 
     # Remove the old file guessing logic since we'll use function calls
     try:
+        start = time.perf_counter()
         stream = await client.chat.completions.create(
             model=DEFAULT_MODEL,
             messages=conversation_history,
@@ -1968,6 +1970,10 @@ async def stream_openai_response(user_message: str):
                                 tool_calls[tool_call_delta.index]["function"][
                                     "arguments"
                                 ] += tool_call_delta.function.arguments
+
+        duration = time.perf_counter() - start
+        cost = calculate_cost(DEFAULT_MODEL, getattr(stream, "usage", {}))
+        add_cost(cost, duration)
 
         console.print()  # New line after streaming
 
@@ -2043,6 +2049,7 @@ async def stream_openai_response(user_message: str):
                     "\n[bold bright_blue]🔄 Processing results...[/bold bright_blue]"
                 )
 
+                follow_up_start = time.perf_counter()
                 follow_up_stream = await client.chat.completions.create(
                     model=DEFAULT_MODEL,
                     messages=conversation_history,
@@ -2079,6 +2086,12 @@ async def stream_openai_response(user_message: str):
                             reasoning_started = False
                         follow_up_content += chunk.choices[0].delta.content
                         console.print(chunk.choices[0].delta.content, end="")
+
+                follow_up_duration = time.perf_counter() - follow_up_start
+                follow_up_cost = calculate_cost(
+                    DEFAULT_MODEL, getattr(follow_up_stream, "usage", {})
+                )
+                add_cost(follow_up_cost, follow_up_duration)
 
                 console.print()
 
@@ -2275,6 +2288,7 @@ async def main(no_index: bool = False):
         except subprocess.TimeoutExpired:
             engine_proc.kill()
     print_profiling_stats()
+    console.print(format_cost_summary())
 
 
 if __name__ == "__main__":

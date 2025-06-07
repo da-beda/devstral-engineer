@@ -26,10 +26,15 @@ def main(
         "--debug",
         help="Debug output with profiling and engine logs",
     ),
+    no_index: bool = typer.Option(
+        False,
+        "--no-index",
+        help="Skip launching the indexing engine for this session",
+    ),
 ) -> None:
     """Start interactive chat when no subcommand is provided."""
     if ctx.invoked_subcommand is None:
-        chat(verbose=verbose, debug=debug)
+        chat(verbose=verbose, debug=debug, no_index=no_index)
 
 
 @app.command()

@@ -1970,7 +1970,7 @@ async def stream_openai_response(user_message: str):
 # --------------------------------------------------------------------------------
 
 
-async def main():
+async def main(no_index: bool = False):
 
     global client, DEFAULT_MODEL
     config = Config.load()
@@ -1980,8 +1980,8 @@ async def main():
     )
     DEFAULT_MODEL = config.default_model
 
-    # Launch indexing engine subprocess only when enabled
-    if config.indexing_enabled:
+    # Launch indexing engine subprocess only when enabled and not suppressed
+    if config.indexing_enabled and not no_index:
         launch_engine(ENGINE_PORT, debug=VERBOSE or DEBUG)
         start_status_thread()
 

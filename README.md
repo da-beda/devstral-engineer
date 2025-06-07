@@ -148,6 +148,7 @@ For when you want to preload files into conversation context:
    - `indexing_enabled`: enable the local code indexing engine. When set to
      `true`, the indexing engine is launched automatically on startup; when
      `false`, code indexing and search are skipped.
+   - You can also disable it for a single run with the `--no-index` flag.
    - `index_engine_path`: path to the index engine executable
    - `qdrant_url` / `qdrant_api_key`: connection settings for your Qdrant instance
    - `embedding`: settings for the embedding provider used by the engine
@@ -357,7 +358,7 @@ devstral clear-history  # remove saved conversation
 
 ### Index Engine Commands
 The code indexing engine is only started when `indexing_enabled` is `true` in
-your configuration.
+your configuration. Pass `--no-index` to temporarily skip launching it.
 ```bash
 devstral index-status   # check if the indexing engine is running
 devstral index-clear    # release the current code index

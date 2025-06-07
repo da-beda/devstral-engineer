@@ -983,10 +983,11 @@ async def summarize_code(file_path: str) -> str:
     prompt = f"Summarize the following code:\n\n```\n{content}\n```"
 
     try:
-        resp = await client.chat.completions.create(
-            model=DEFAULT_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-        )
+        with console.status("Waiting...", spinner="dots"):
+            resp = await client.chat.completions.create(
+                model=DEFAULT_MODEL,
+                messages=[{"role": "user", "content": prompt}],
+            )
         return resp.choices[0].message.content.strip()
     except Exception as e:
         return f"Error summarizing code: {e}"
@@ -2052,6 +2053,8 @@ async def stream_openai_response(user_message: str):
     # Remove the old file guessing logic since we'll use function calls
     try:
         start = time.perf_counter()
+        spinner = console.status("Waiting...", spinner="dots")
+        spinner.start()
         stream = await client.chat.completions.create(
             model=DEFAULT_MODEL,
             messages=conversation_history,
@@ -2070,8 +2073,12 @@ async def stream_openai_response(user_message: str):
         reasoning_content = ""
         final_content = ""
         tool_calls = []
+        first_chunk = True
 
         async for chunk in stream:
+            if first_chunk:
+                spinner.stop()
+                first_chunk = False
             # Handle reasoning content if available
             if (
                 hasattr(chunk.choices[0].delta, "reasoning_content")
@@ -2117,6 +2124,8 @@ async def stream_openai_response(user_message: str):
                                     "arguments"
                                 ] += tool_call_delta.function.arguments
 
+        if first_chunk:
+            spinner.stop()
         duration = time.perf_counter() - start
         cost = calculate_cost(DEFAULT_MODEL, getattr(stream, "usage", {}))
         add_cost(cost, duration)
@@ -2196,6 +2205,8 @@ async def stream_openai_response(user_message: str):
                 )
 
                 follow_up_start = time.perf_counter()
+                follow_spinner = console.status("Waiting...", spinner="dots")
+                follow_spinner.start()
                 follow_up_stream = await client.chat.completions.create(
                     model=DEFAULT_MODEL,
                     messages=conversation_history,
@@ -2211,8 +2222,12 @@ async def stream_openai_response(user_message: str):
 
                 follow_up_content = ""
                 reasoning_started = False
+                first_follow_chunk = True
 
                 async for chunk in follow_up_stream:
+                    if first_follow_chunk:
+                        follow_spinner.stop()
+                        first_follow_chunk = False
                     # Handle reasoning content if available
                     if (
                         hasattr(chunk.choices[0].delta, "reasoning_content")
@@ -2233,6 +2248,8 @@ async def stream_openai_response(user_message: str):
                         follow_up_content += chunk.choices[0].delta.content
                         console.print(chunk.choices[0].delta.content, end="")
 
+                if first_follow_chunk:
+                    follow_spinner.stop()
                 follow_up_duration = time.perf_counter() - follow_up_start
                 follow_up_cost = calculate_cost(
                     DEFAULT_MODEL, getattr(follow_up_stream, "usage", {})
@@ -2250,6 +2267,14 @@ async def stream_openai_response(user_message: str):
         return {"success": True}
 
     except Exception as e:
+        try:
+            spinner.stop()
+        except Exception:
+            pass
+        try:
+            follow_spinner.stop()
+        except Exception:
+            pass
         error_msg = f"OpenRouter API error: {str(e)}"
         console.print(f"\n[{THEME.error}]❌ {error_msg}[/{THEME.error}]")
         return {"error": error_msg}

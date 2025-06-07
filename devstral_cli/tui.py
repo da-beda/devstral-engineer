@@ -5,6 +5,8 @@ import contextlib
 from typing import Any
 
 from rich.console import Console
+
+from .logo import display_logo
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal
 from textual.widgets import Input, TextLog
@@ -104,4 +106,5 @@ def run_tui(*, verbose: bool = False, debug: bool = False, no_index: bool = Fals
 
     devstral_eng.VERBOSE = verbose
     devstral_eng.DEBUG = debug
+    display_logo(Console())
     DevstralTUI(no_index=no_index).run()

@@ -5,6 +5,8 @@ from .onboarding import onboard
 from ddg_search import clear_ddg_cache
 from conversation_store import display_history, clear_history, search_history
 from .chat import chat
+from .logo import display_logo
+from rich.console import Console
 
 app = typer.Typer(
     help=(
@@ -164,5 +166,15 @@ def index_clear() -> None:
     res = asyncio.run(_run())
     typer.echo(res.get("status", "unknown"))
 
+    
+@app.command("onboard")
+def onboard_cmd() -> None:
+    """Run onboarding process to set up configuration."""
+    onboard()
 
-app.command()(onboard)
+    
+@app.command("show-logo")
+def show_logo() -> None:
+    """Display the Devstral ASCII logo."""
+    display_logo(Console())
+

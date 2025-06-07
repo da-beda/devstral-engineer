@@ -13,7 +13,7 @@ from openai import AsyncOpenAI
 from planner import plan_steps
 from pydantic import BaseModel
 from dotenv import load_dotenv
-from config import Config
+from config import Config, CONFIG_DIR
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
@@ -27,6 +27,8 @@ from rich.progress import (
 import questionary
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style as PromptStyle
+from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.history import FileHistory
 import time
 import argparse
 import difflib
@@ -146,11 +148,39 @@ def stop_status_thread() -> None:
         status_thread.join(timeout=5)
 
 
+class SlashCommandCompleter(Completer):
+    """Simple completer for interactive slash commands."""
+
+    commands = [
+        "/add",
+        "/undo",
+        "/search",
+        "/deep-research",
+        "/code-search",
+        "/plan",
+        "/help",
+    ]
+
+    def get_completions(self, document, complete_event):  # pragma: no cover - UI helper
+        text = document.text_before_cursor.lstrip()
+        if not text.startswith("/"):
+            return
+        for cmd in self.commands:
+            if cmd.startswith(text):
+                yield Completion(cmd, start_position=-len(text))
+
+
 # Initialize Rich console and prompt session
 config = Config.load()
 THEME = config.theme
 console = Console()
+
+COMMAND_HISTORY_FILE = CONFIG_DIR / "command_history.txt"
+COMMAND_HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
+
 prompt_session = PromptSession(
+    completer=SlashCommandCompleter(),
+    history=FileHistory(str(COMMAND_HISTORY_FILE)),
     style=PromptStyle.from_dict(
         {
             "prompt": "#0066ff bold",  # Bright blue prompt

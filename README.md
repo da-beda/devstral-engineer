@@ -106,6 +106,7 @@ For when you want to preload files into conversation context:
 - **Real-time streaming** with visible reasoning process
 - **Structured tables** for diff previews
 - **Progress indicators** for long operations
+- **Slash command auto-completion** and persistent command history
 
 ### 🛡️ **Security & Safety**
 - **Path normalization** and validation

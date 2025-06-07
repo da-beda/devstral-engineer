@@ -1,6 +1,7 @@
 import json
 import typer
 from config import Config, CONFIG_FILE, ThemeConfig
+from .onboarding import onboard
 from ddg_search import clear_ddg_cache
 from conversation_store import display_history, clear_history, search_history
 from .chat import chat
@@ -39,6 +40,8 @@ def main(
     ),
 ) -> None:
     """Start interactive chat when no subcommand is provided."""
+    if not CONFIG_FILE.exists():
+        onboard()
     if ctx.invoked_subcommand is None:
         if tui:
             from .tui import run_tui
@@ -160,3 +163,6 @@ def index_clear() -> None:
 
     res = asyncio.run(_run())
     typer.echo(res.get("status", "unknown"))
+
+
+app.command()(onboard)

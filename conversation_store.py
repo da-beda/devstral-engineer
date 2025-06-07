@@ -42,3 +42,18 @@ def clear_history() -> None:
     """Remove the stored conversation history file."""
     if HISTORY_FILE.exists():
         HISTORY_FILE.unlink()
+
+
+def search_history(term: str) -> List[Dict[str, Any]]:
+    """Return conversation messages containing ``term`` (case-insensitive)."""
+    if not term:
+        return []
+    term = term.lower()
+    results: List[Dict[str, Any]] = []
+    for item in load_history():
+        try:
+            if term in json.dumps(item, ensure_ascii=False).lower():
+                results.append(item)
+        except Exception as exc:  # pragma: no cover - defensive
+            logger.debug("Failed to search message: %s", exc)
+    return results

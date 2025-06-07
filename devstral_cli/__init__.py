@@ -1,7 +1,8 @@
+import json
 import typer
 from config import Config, CONFIG_FILE
 from ddg_search import clear_ddg_cache
-from conversation_store import display_history, clear_history
+from conversation_store import display_history, clear_history, search_history
 from .chat import chat
 
 app = typer.Typer(
@@ -89,6 +90,16 @@ def clear_history_cmd() -> None:
     """Delete the stored conversation history."""
     clear_history()
     typer.echo("Conversation history cleared.")
+
+
+@app.command("history-search")
+def history_search_cmd(term: str) -> None:
+    """Search conversation history for messages containing TERM."""
+    matches = search_history(term)
+    if not matches:
+        typer.echo("No matching messages found.")
+    else:
+        typer.echo(json.dumps(matches, ensure_ascii=False, indent=2))
 
 
 @app.command("code-search")

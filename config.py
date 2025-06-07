@@ -16,6 +16,12 @@ class EmbeddingConfig(BaseModel):
     model: Optional[str] = None
     api_key: Optional[str] = None
 
+    # Provide compatibility with pydantic v1
+    def model_dump(self, *args, **kwargs):  # type: ignore[override]
+        if hasattr(BaseModel, "model_dump"):
+            return super().model_dump(*args, **kwargs)
+        return self.dict(*args, **kwargs)
+
 
 class Config(BaseModel):
     """Application configuration loaded from YAML or environment variables."""
@@ -27,6 +33,12 @@ class Config(BaseModel):
     qdrant_url: Optional[str] = None
     qdrant_api_key: Optional[str] = None
     embedding: EmbeddingConfig = EmbeddingConfig()
+
+    # Provide compatibility with pydantic v1
+    def model_dump(self, *args, **kwargs):  # type: ignore[override]
+        if hasattr(BaseModel, "model_dump"):
+            return super().model_dump(*args, **kwargs)
+        return self.dict(*args, **kwargs)
 
     @classmethod
     def load(cls, path: Path = CONFIG_FILE) -> "Config":
@@ -77,4 +89,7 @@ class Config(BaseModel):
     def save(self, path: Path = CONFIG_FILE) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("w") as f:
-            yaml.safe_dump(self.model_dump(), f)
+            if hasattr(self, "model_dump"):
+                yaml.safe_dump(self.model_dump(), f)
+            else:
+                yaml.safe_dump(self.dict(), f)

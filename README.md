@@ -373,6 +373,14 @@ monitors your workspace with filesystem events, re‑embedding only changed file
 and upserting them into a Qdrant HNSW collection. For huge repos you can combine
 Qdrant's payload filters or a small BM25 layer as a fast first pass.
 
+### Bundled Qdrant Binary
+Starting with version 1.8 the Qdrant project provides a statically linked MUSL
+build. Run `scripts/build_qdrant.sh` to cross-compile the Linux binary or simply
+download the release archive. Place the resulting executable in
+`devstral_cli/bin/` named `qdrant-linux-x86_64` and it will be packaged inside
+the wheel. At runtime the CLI automatically spawns this binary when no
+`qdrant_url` is configured.
+
 ### Debug Profiling
 Run with `--debug` to see timing information for context management:
 ```bash

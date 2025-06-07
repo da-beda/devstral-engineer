@@ -45,6 +45,7 @@ import asyncio
 from code_index_engine.client import IndexClient
 import threading
 import urllib.request
+from devstral_cli.qdrant_runtime import start_qdrant, stop_qdrant
 
 try:
     import tiktoken
@@ -68,6 +69,7 @@ PRODUCT_COMMAND = "devstral"
 ENGINE_PORT = 8001
 engine_proc: subprocess.Popen | None = None
 index_client = IndexClient(f"http://127.0.0.1:{ENGINE_PORT}")
+qdrant_proc: subprocess.Popen | None = None
 STATUS_POLL_INTERVAL = 5.0
 status_stop_event = threading.Event()
 status_thread: threading.Thread | None = None
@@ -84,10 +86,15 @@ def launch_engine(port: int = ENGINE_PORT, debug: bool = False) -> None:
         If ``True`` the engine's stdout/stderr will be shown instead of
         being suppressed.
     """
-    global engine_proc, index_client, ENGINE_PORT
+    global engine_proc, index_client, ENGINE_PORT, qdrant_proc
     ENGINE_PORT = port
     index_client = IndexClient(f"http://127.0.0.1:{ENGINE_PORT}")
     console.log(f"Starting index engine on port {ENGINE_PORT}")
+
+    if not config.qdrant_url:
+        qdrant_proc = start_qdrant()
+        config.qdrant_url = "http://127.0.0.1:6333"
+        time.sleep(1)
     engine_proc = subprocess.Popen(
         [
             sys.executable,
@@ -2464,6 +2471,8 @@ async def main(no_index: bool = False):
             engine_proc.wait(timeout=5)
         except subprocess.TimeoutExpired:
             engine_proc.kill()
+    if qdrant_proc:
+        stop_qdrant()
     print_profiling_stats()
     console.print(format_cost_summary())
 

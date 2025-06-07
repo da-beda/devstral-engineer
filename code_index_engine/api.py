@@ -42,6 +42,17 @@ def stop():
     return {"status": "stopped"}
 
 
+@app.post("/clear")
+def clear():
+    """Release the current index without shutting down the server."""
+    global scanner, watcher
+    if watcher:
+        watcher.stop()
+    scanner = None
+    watcher = None
+    return {"status": "cleared"}
+
+
 @app.post("/search")
 def search(req: SearchRequest):
     if not scanner:

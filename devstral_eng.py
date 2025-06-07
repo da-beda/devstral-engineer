@@ -1368,7 +1368,9 @@ def is_binary_file(file_path: str, peek_size: int = 1024) -> bool:
             return False
 
         # UTF-16/UTF-32 BOM detection
-        if chunk.startswith((b"\xff\xfe", b"\xfe\xff", b"\xff\xfe\x00\x00", b"\x00\x00\xfe\xff")):
+        if chunk.startswith(
+            (b"\xff\xfe", b"\xfe\xff", b"\xff\xfe\x00\x00", b"\x00\x00\xfe\xff")
+        ):
             try:
                 chunk.decode("utf-16")
                 return False

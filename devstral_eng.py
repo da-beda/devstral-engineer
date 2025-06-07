@@ -947,6 +947,27 @@ def manage_dependency(action: str, package: str) -> str:
     return run_bash(cmd)
 
 
+def get_git_summary() -> str:
+    """Return a brief git summary with branch, status and recent commits."""
+    branch = run_bash("git branch --show-current")
+    status = git_status()
+    log = git_log(5)
+    return (
+        f"Branch: {branch}\n\nStatus:\n{status}\n\nRecent commits:\n{log}"
+    )
+
+
+def get_readme_content(max_chars: int = 2000) -> str | None:
+    """Return README.md contents truncated to ``max_chars`` if it exists."""
+    path = Path("README.md")
+    if not path.exists():
+        return None
+    text = path.read_text(encoding="utf-8")
+    if len(text) > max_chars:
+        return text[:max_chars] + "\n...(truncated)"
+    return text
+
+
 async def search_code(query: str, directory_prefix: str | None = None) -> str:
     """Search indexed code using the local index engine."""
     try:
@@ -2142,6 +2163,15 @@ async def main(no_index: bool = False):
         Panel(initial_ls, title="Current Directory", border_style=THEME.panel)
     )
     add_to_history({"role": "system", "content": f"Directory listing:\n{initial_ls}"})
+
+    git_info = get_git_summary()
+    console.print(Panel(git_info, title="Git Status", border_style="cyan"))
+    add_to_history({"role": "system", "content": f"Git info:\n{git_info}"})
+
+    readme = get_readme_content()
+    if readme:
+        console.print(Panel(readme, title="README.md", border_style="cyan"))
+        add_to_history({"role": "system", "content": f"README:\n{readme}"})
 
     while True:
         try:

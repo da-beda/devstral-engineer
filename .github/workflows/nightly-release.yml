@@ -1,0 +1,32 @@
+name: Nightly Release
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+      - name: Build package
+        run: python -m build --sdist --wheel
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: nightly-${{ github.run_number }}
+          name: Nightly ${{ github.run_number }}
+          draft: false
+          prerelease: true
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

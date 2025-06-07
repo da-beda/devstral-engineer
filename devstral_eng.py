@@ -140,6 +140,8 @@ def stop_status_thread() -> None:
 
 
 # Initialize Rich console and prompt session
+config = Config.load()
+THEME = config.theme
 console = Console()
 prompt_session = PromptSession(
     style=PromptStyle.from_dict(
@@ -671,7 +673,7 @@ def create_file(path: str, content: str):
     with open(file_path, "w", encoding="utf-8") as f:
         f.write(content)
     console.print(
-        f"[bold blue]✓[/bold blue] Created/updated file at '[bright_cyan]{file_path}[/bright_cyan]'"
+        f"[{THEME.success}]✓[/{THEME.success}] Created/updated file at '[bright_cyan]{file_path}[/bright_cyan]'"
     )
 
 
@@ -934,7 +936,7 @@ def show_diff_table(files_to_edit: List[FileToEdit]) -> None:
         show_header=True,
         header_style="bold bright_blue",
         show_lines=True,
-        border_style="blue",
+        border_style=THEME.panel,
     )
     table.add_column("File Path", style="bright_cyan", no_wrap=True)
     table.add_column("Original", style="red dim")
@@ -958,7 +960,7 @@ def apply_diff_edit(path: str, original_snippet: str, new_snippet: str):
             raise ValueError("Original snippet not found")
         if occurrences > 1:
             console.print(
-                f"[bold yellow]⚠ Multiple matches ({occurrences}) found - requiring line numbers for safety[/bold yellow]"
+                f"[{THEME.warning}]⚠ Multiple matches ({occurrences}) found - requiring line numbers for safety[/{THEME.warning}]"
             )
             console.print(
                 "[dim]Use format:\n--- original.py (lines X-Y)\n+++ modified.py[/dim]"
@@ -976,39 +978,43 @@ def apply_diff_edit(path: str, original_snippet: str, new_snippet: str):
             )
         )
         console.print(
-            Panel(diff, title=f"Diff for {normalized_path}", border_style="green")
+            Panel(diff, title=f"Diff for {normalized_path}", border_style=THEME.panel)
         )
 
         confirm = questionary.confirm("Apply this diff?", default=False).ask()
         if not confirm:
-            console.print("[bold yellow]⚠ Diff edit skipped by user[/bold yellow]")
+            console.print(
+                f"[{THEME.warning}]⚠ Diff edit skipped by user[/{THEME.warning}]"
+            )
             return
 
         create_file(normalized_path, updated_content)
         console.print(
-            f"[bold blue]✓[/bold blue] Applied diff edit to '[bright_cyan]{normalized_path}[/bright_cyan]'"
+            f"[{THEME.success}]✓[/{THEME.success}] Applied diff edit to '[bright_cyan]{normalized_path}[/bright_cyan]'"
         )
 
     except FileNotFoundError:
         console.print(
-            f"[bold red]✗[/bold red] File not found for diff editing: '[bright_cyan]{normalized_path}[/bright_cyan]'"
+            f"[{THEME.error}]✗[/{THEME.error}] File not found for diff editing: '[bright_cyan]{normalized_path}[/bright_cyan]'"
         )
     except ValueError as e:
         console.print(
-            f"[bold yellow]⚠[/bold yellow] {str(e)} in '[bright_cyan]{normalized_path}[/bright_cyan]'. No changes made."
+            f"[{THEME.warning}]⚠[/{THEME.warning}] {str(e)} in '[bright_cyan]{normalized_path}[/bright_cyan]'. No changes made."
         )
-        console.print("\n[bold blue]Expected snippet:[/bold blue]")
+        console.print(f"\n[{THEME.success}]Expected snippet:[/{THEME.success}]")
         console.print(
             Panel(
                 original_snippet,
                 title="Expected",
-                border_style="blue",
+                border_style=THEME.panel,
                 title_align="left",
             )
         )
-        console.print("\n[bold blue]Actual file content:[/bold blue]")
+        console.print(f"\n[{THEME.success}]Actual file content:[/{THEME.success}]")
         console.print(
-            Panel(content, title="Actual", border_style="yellow", title_align="left")
+            Panel(
+                content, title="Actual", border_style=THEME.warning, title_align="left"
+            )
         )
 
 
@@ -1031,11 +1037,11 @@ async def try_handle_add_command(user_input: str) -> bool:
                     }
                 )
                 console.print(
-                    f"[bold blue]✓[/bold blue] Added file '[bright_cyan]{normalized_path}[/bright_cyan]' to conversation.\n"
+                    f"[{THEME.success}]✓[/{THEME.success}] Added file '[bright_cyan]{normalized_path}[/bright_cyan]' to conversation.\n"
                 )
         except OSError as e:
             console.print(
-                f"[bold red]✗[/bold red] Could not add path '[bright_cyan]{path_to_add}[/bright_cyan]': {e}\n"
+                f"[{THEME.error}]✗[/{THEME.error}] Could not add path '[bright_cyan]{path_to_add}[/bright_cyan]': {e}\n"
             )
         return True
     return False
@@ -1049,14 +1055,18 @@ async def try_handle_search_command(user_input: str) -> bool:
 
     query = user_input[len(prefix) :].strip()
     if not query:
-        console.print("[bold yellow]⚠ Usage:[/bold yellow] /search <your query>")
+        console.print(
+            f"[{THEME.warning}]⚠ Usage:[/{THEME.warning}] /search <your query>"
+        )
         return True
 
-    console.print(f"[bold blue]🔍 Searching DuckDuckGo for:[/bold blue] '{query}'")
+    console.print(
+        f"[{THEME.success}]🔍 Searching DuckDuckGo for:[/{THEME.success}] '{query}'"
+    )
     try:
         results = await async_ddg_search(query, max_results=5)
         if not results:
-            console.print("[bold yellow]⚠ No results found.[/bold yellow]")
+            console.print(f"[{THEME.warning}]⚠ No results found.[/{THEME.warning}]")
             add_to_history(
                 {
                     "role": "system",
@@ -1067,9 +1077,11 @@ async def try_handle_search_command(user_input: str) -> bool:
 
         md = ddg_results_to_markdown(results)
         add_to_history({"role": "system", "content": md})
-        console.print(Panel(md, title="Search Results (Markdown)", border_style="cyan"))
+        console.print(
+            Panel(md, title="Search Results (Markdown)", border_style=THEME.panel)
+        )
     except Exception as e:
-        console.print(f"[bold red]✗ DuckDuckGo search failed:[/bold red] {e}")
+        console.print(f"[{THEME.error}]✗ DuckDuckGo search failed:[/{THEME.error}] {e}")
         add_to_history(
             {
                 "role": "system",
@@ -1087,11 +1099,13 @@ async def try_handle_deep_command(user_input: str) -> bool:
 
     query_terms = user_input[len(prefix) :].strip()
     if not query_terms:
-        console.print("[bold yellow]⚠ Usage:[/bold yellow] /deep-research <your query>")
+        console.print(
+            f"[{THEME.warning}]⚠ Usage:[/{THEME.warning}] /deep-research <your query>"
+        )
         return True
 
     console.print(
-        f"[bold blue]🔎 Starting Deep Research for:[/bold blue] '{query_terms}'"
+        f"[{THEME.success}]🔎 Starting Deep Research for:[/{THEME.success}] '{query_terms}'"
     )
     try:
         md_content = await deep_research(query_terms)
@@ -1100,11 +1114,11 @@ async def try_handle_deep_command(user_input: str) -> bool:
             Panel(
                 md_content,
                 title="Deep Research Results (Markdown)",
-                border_style="magenta",
+                border_style=THEME.panel,
             )
         )
     except Exception as e:
-        console.print(f"[bold red]✗ Deep research failed:[/bold red] {e}")
+        console.print(f"[{THEME.error}]✗ Deep research failed:[/{THEME.error}] {e}")
         add_to_history(
             {
                 "role": "system",
@@ -1122,17 +1136,23 @@ async def try_handle_code_search_command(user_input: str) -> bool:
 
     query = user_input[len(prefix) :].strip()
     if not query:
-        console.print("[bold yellow]⚠ Usage:[/bold yellow] /code-search <query>")
+        console.print(
+            f"[{THEME.warning}]⚠ Usage:[/{THEME.warning}] /code-search <query>"
+        )
         return True
 
     try:
         results = await index_client.search(query)
         if not results:
-            console.print("[bold yellow]⚠ No code matches found.[/bold yellow]")
+            console.print(
+                f"[{THEME.warning}]⚠ No code matches found.[/{THEME.warning}]"
+            )
             return True
         lines = [f"[cyan]{r['path']}[/cyan]\n{r['content']}" for r in results]
         content = "\n\n".join(lines)
-        console.print(Panel(content, title="Code Search Results", border_style="green"))
+        console.print(
+            Panel(content, title="Code Search Results", border_style=THEME.panel)
+        )
         add_to_history(
             {
                 "role": "system",
@@ -1140,7 +1160,7 @@ async def try_handle_code_search_command(user_input: str) -> bool:
             }
         )
     except Exception as e:
-        console.print(f"[bold red]✗ Code search failed:[/bold red] {e}")
+        console.print(f"[{THEME.error}]✗ Code search failed:[/{THEME.error}] {e}")
     return True
 
 
@@ -1274,7 +1294,7 @@ async def add_directory_to_conversation(directory_path: str):
         for root, dirs, files in os.walk(directory_path):
             if len(eligible_files) >= max_files:
                 console.print(
-                    f"[bold yellow]⚠[/bold yellow] Reached maximum file limit ({max_files})"
+                    f"[{THEME.warning}]⚠[/{THEME.warning}] Reached maximum file limit ({max_files})"
                 )
                 break
 
@@ -1339,17 +1359,17 @@ async def add_directory_to_conversation(directory_path: str):
         total_files_processed = len(added_files)
 
         console.print(
-            f"[bold blue]✓[/bold blue] Added folder '[bright_cyan]{directory_path}[/bright_cyan]' to conversation."
+            f"[{THEME.success}]✓[/{THEME.success}] Added folder '[bright_cyan]{directory_path}[/bright_cyan]' to conversation."
         )
         if added_files:
             console.print(
-                f"\n[bold bright_blue]📁 Added files:[/bold bright_blue] [dim]({len(added_files)} of {total_files_processed})[/dim]"
+                f"\n[{THEME.success}]📁 Added files:[/{THEME.success}] [dim]({len(added_files)} of {total_files_processed})[/dim]"
             )
             for f in added_files:
                 console.print(f"  [bright_cyan]📄 {f}[/bright_cyan]")
         if skipped_files:
             console.print(
-                f"\n[bold yellow]⏭ Skipped files:[/bold yellow] [dim]({len(skipped_files)})[/dim]"
+                f"\n[{THEME.warning}]⏭ Skipped files:[/{THEME.warning}] [dim]({len(skipped_files)})[/dim]"
             )
             for f in skipped_files[:10]:  # Show only first 10 to avoid clutter
                 console.print(f"  [yellow dim]⚠ {f}[/yellow dim]")
@@ -1409,7 +1429,7 @@ def ensure_file_in_context(file_path: str) -> bool:
         return True
     except OSError:
         console.print(
-            f"[bold red]✗[/bold red] Could not read file '[bright_cyan]{file_path}[/bright_cyan]' for editing context"
+            f"[{THEME.error}]✗[/{THEME.error}] Could not read file '[bright_cyan]{file_path}[/bright_cyan]' for editing context"
         )
         return False
 
@@ -1451,12 +1471,14 @@ def normalize_path(path_str: str) -> str:
 def undo_last_change(num_undos: int = 1):
     """Undo the most recent file creation or edit operations."""
     if not file_history:
-        console.print("[bold yellow]ℹ No changes to undo.[/bold yellow]")
+        console.print(f"[{THEME.warning}]ℹ No changes to undo.[/{THEME.warning}]")
         return
 
     for _ in range(num_undos):
         if not file_history:
-            console.print("[bold yellow]ℹ No more changes to undo.[/bold yellow]")
+            console.print(
+                f"[{THEME.warning}]ℹ No more changes to undo.[/{THEME.warning}]"
+            )
             break
 
         action, path, backup = file_history.pop()
@@ -1465,17 +1487,19 @@ def undo_last_change(num_undos: int = 1):
                 if os.path.exists(path):
                     os.remove(path)
                     console.print(
-                        f"[bold blue]✓[/bold blue] Deleted file '[bright_cyan]{path}[/bright_cyan]' (undo creation)"
+                        f"[{THEME.success}]✓[/{THEME.success}] Deleted file '[bright_cyan]{path}[/bright_cyan]' (undo creation)"
                     )
             elif action == "edit":
                 Path(path).parent.mkdir(parents=True, exist_ok=True)
                 with open(path, "w", encoding="utf-8") as f:
                     f.write(backup or "")
                 console.print(
-                    f"[bold blue]✓[/bold blue] Restored file '[bright_cyan]{path}[/bright_cyan]' (undo edit)"
+                    f"[{THEME.success}]✓[/{THEME.success}] Restored file '[bright_cyan]{path}[/bright_cyan]' (undo edit)"
                 )
         except Exception as e:
-            console.print(f"[bold red]✗ Failed to undo change: {e}[/bold red]")
+            console.print(
+                f"[{THEME.error}]✗ Failed to undo change: {e}[/{THEME.error}]"
+            )
             break
 
 
@@ -1799,7 +1823,7 @@ async def stream_openai_response(user_message: str):
         TOKEN_LIMIT = 64000
         if total_tokens > TOKEN_LIMIT * 0.8:
             console.print(
-                f"[bold yellow]⚠ Token usage: {total_tokens}/{TOKEN_LIMIT}[/bold yellow]"
+                f"[{THEME.warning}]⚠ Token usage: {total_tokens}/{TOKEN_LIMIT}[/{THEME.warning}]"
             )
 
     # Remove the old file guessing logic since we'll use function calls
@@ -1992,7 +2016,7 @@ async def stream_openai_response(user_message: str):
 
     except Exception as e:
         error_msg = f"OpenRouter API error: {str(e)}"
-        console.print(f"\n[bold red]❌ {error_msg}[/bold red]")
+        console.print(f"\n[{THEME.error}]❌ {error_msg}[/{THEME.error}]")
         return {"error": error_msg}
 
 
@@ -2003,8 +2027,9 @@ async def stream_openai_response(user_message: str):
 
 async def main(no_index: bool = False):
 
-    global client, DEFAULT_MODEL
+    global client, DEFAULT_MODEL, config, THEME
     config = Config.load()
+    THEME = config.theme
     client = AsyncOpenAI(
         base_url="https://openrouter.ai/api/v1",
         api_key=config.api_key,
@@ -2023,7 +2048,7 @@ async def main(no_index: bool = False):
     console.print(
         Panel.fit(
             welcome_text,
-            border_style="bright_blue",
+            border_style=THEME.panel,
             padding=(1, 2),
             title="[bold bright_cyan]🤖 AI Code Assistant[/bold bright_cyan]",
             title_align="center",
@@ -2048,7 +2073,7 @@ async def main(no_index: bool = False):
     console.print(
         Panel(
             instructions,
-            border_style="blue",
+            border_style=THEME.panel,
             padding=(1, 2),
             title="[bold blue]💡 How to Use[/bold blue]",
             title_align="left",
@@ -2058,14 +2083,18 @@ async def main(no_index: bool = False):
 
     # Orientation step: show initial directory listing
     initial_ls = list_directory()
-    console.print(Panel(initial_ls, title="Current Directory", border_style="cyan"))
+    console.print(
+        Panel(initial_ls, title="Current Directory", border_style=THEME.panel)
+    )
     add_to_history({"role": "system", "content": f"Directory listing:\n{initial_ls}"})
 
     while True:
         try:
             user_input = (await prompt_session.prompt_async("🔵 You> ")).strip()
         except (EOFError, KeyboardInterrupt):
-            console.print("\n[bold yellow]👋 Exiting gracefully...[/bold yellow]")
+            console.print(
+                f"\n[{THEME.warning}]👋 Exiting gracefully...[/{THEME.warning}]"
+            )
             break
 
         if not user_input:
@@ -2101,7 +2130,7 @@ async def main(no_index: bool = False):
                 undo_last_change(num_undos)
             except ValueError:
                 console.print(
-                    "[bold red]✗ Invalid number of undos. Usage: /undo [N][/bold red]"
+                    f"[{THEME.error}]✗ Invalid number of undos. Usage: /undo [N][/{THEME.error}]"
                 )
             continue
 
@@ -2114,10 +2143,12 @@ async def main(no_index: bool = False):
             plan_requested = True
 
         if plan_requested:
-            console.print("[bold cyan]🗺 Planning steps...[/bold cyan]")
+            console.print(f"[{THEME.success}]🗺 Planning steps...[/{THEME.success}]")
             plan = await plan_steps(request_text, tools)
             if not plan:
-                console.print("[bold yellow]⚠ Planner produced no steps[/bold yellow]")
+                console.print(
+                    f"[{THEME.warning}]⚠ Planner produced no steps[/{THEME.warning}]"
+                )
             for step in plan:
                 name = step.get("tool")
                 args = step.get("args", {})
@@ -2140,10 +2171,12 @@ async def main(no_index: bool = False):
         response_data = await stream_openai_response(user_input)
 
         if response_data.get("error"):
-            console.print(f"[bold red]❌ Error: {response_data['error']}[/bold red]")
+            console.print(
+                f"[{THEME.error}]❌ Error: {response_data['error']}[/{THEME.error}]"
+            )
 
     console.print(
-        "[bold blue]✨ Session finished. Thank you for using Devstral Engineer![/bold blue]"
+        f"[{THEME.success}]✨ Session finished. Thank you for using Devstral Engineer![/{THEME.success}]"
     )
     if engine_proc:
         try:

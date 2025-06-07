@@ -10,6 +10,7 @@ def test_config_roundtrip(tmp_path):
         qdrant_url="http://localhost:6333",
         qdrant_api_key="qkey",
         embedding=EmbeddingConfig(provider="openai", model="test", api_key="e"),
+        theme=Config().theme,
     )
     path = tmp_path / "config.yaml"
     cfg.save(path)

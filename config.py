@@ -23,6 +23,15 @@ class EmbeddingConfig(BaseModel):
         return self.dict(*args, **kwargs)
 
 
+class ThemeConfig(BaseModel):
+    """Color configuration for terminal output."""
+
+    success: str = "bold blue"
+    error: str = "bold red"
+    warning: str = "bold yellow"
+    panel: str = "green"
+
+
 class Config(BaseModel):
     """Application configuration loaded from YAML or environment variables."""
 
@@ -33,6 +42,7 @@ class Config(BaseModel):
     qdrant_url: Optional[str] = None
     qdrant_api_key: Optional[str] = None
     embedding: EmbeddingConfig = EmbeddingConfig()
+    theme: ThemeConfig = ThemeConfig()
 
     # Provide compatibility with pydantic v1
     def model_dump(self, *args, **kwargs):  # type: ignore[override]
@@ -84,6 +94,22 @@ class Config(BaseModel):
                 if env_api:
                     emb["api_key"] = env_api
                 data["embedding"] = emb
+        if "theme" not in data:
+            env_success = os.getenv("THEME_SUCCESS")
+            env_error = os.getenv("THEME_ERROR")
+            env_warning = os.getenv("THEME_WARNING")
+            env_panel = os.getenv("THEME_PANEL")
+            if any([env_success, env_error, env_warning, env_panel]):
+                theme: Dict[str, Any] = {}
+                if env_success:
+                    theme["success"] = env_success
+                if env_error:
+                    theme["error"] = env_error
+                if env_warning:
+                    theme["warning"] = env_warning
+                if env_panel:
+                    theme["panel"] = env_panel
+                data["theme"] = theme
         return cls(**data)
 
     def save(self, path: Path = CONFIG_FILE) -> None:

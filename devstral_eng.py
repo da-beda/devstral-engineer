@@ -1723,22 +1723,30 @@ async def _execute_tool(function_name: str, arguments: Dict[str, Any]) -> str:
 
 async def execute_function_call_dict(tool_call_dict) -> str:
     """Execute a function call from a dictionary format and return the result as a string."""
+    function_name = "unknown"
     try:
         function_name = tool_call_dict["function"]["name"]
         arguments = json.loads(tool_call_dict["function"]["arguments"])
         return await _execute_tool(function_name, arguments)
-
+    except KeyError as e:
+        return f"Malformed tool call dictionary: missing {e.args[0]}"
+    except json.JSONDecodeError as e:
+        return f"Invalid JSON arguments for {function_name}: {str(e)}"
     except Exception as e:
         return f"Error executing {function_name}: {str(e)}"
 
 
 async def execute_function_call(tool_call) -> str:
     """Execute a function call and return the result as a string."""
+    function_name = "unknown"
     try:
         function_name = tool_call.function.name
         arguments = json.loads(tool_call.function.arguments)
         return await _execute_tool(function_name, arguments)
-
+    except KeyError as e:
+        return f"Malformed tool call object: missing {e.args[0]}"
+    except json.JSONDecodeError as e:
+        return f"Invalid JSON arguments for {function_name}: {str(e)}"
     except Exception as e:
         return f"Error executing {function_name}: {str(e)}"
 

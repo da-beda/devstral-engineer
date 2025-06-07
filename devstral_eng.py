@@ -155,12 +155,8 @@ prompt_session = PromptSession(
 # 1. Configure OpenAI client and load environment variables
 # --------------------------------------------------------------------------------
 load_dotenv()  # Load environment variables from .env file
-cfg = Config.load()
-client = AsyncOpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=cfg.api_key,
-)
-DEFAULT_MODEL = cfg.default_model
+client: AsyncOpenAI | None = None
+DEFAULT_MODEL = "mistralai/devstral-small:free"
 
 
 # --------------------------------------------------------------------------------
@@ -1976,9 +1972,18 @@ async def stream_openai_response(user_message: str):
 
 async def main():
 
-    # Launch indexing engine subprocess
-    launch_engine(ENGINE_PORT, debug=VERBOSE or DEBUG)
-    start_status_thread()
+    global client, DEFAULT_MODEL
+    config = Config.load()
+    client = AsyncOpenAI(
+        base_url="https://openrouter.ai/api/v1",
+        api_key=config.api_key,
+    )
+    DEFAULT_MODEL = config.default_model
+
+    # Launch indexing engine subprocess only when enabled
+    if config.indexing_enabled:
+        launch_engine(ENGINE_PORT, debug=VERBOSE or DEBUG)
+        start_status_thread()
 
     # Create a beautiful gradient-style welcome panel
     welcome_text = """[bold bright_blue]🐋 Devstral Engineer[/bold bright_blue] [bright_cyan]with Function Calling[/bright_cyan]

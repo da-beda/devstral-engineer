@@ -17,6 +17,13 @@ from config import Config
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+from rich.progress import (
+    Progress,
+    SpinnerColumn,
+    BarColumn,
+    TextColumn,
+    TaskProgressColumn,
+)
 import questionary
 from prompt_toolkit import PromptSession
 from prompt_toolkit.styles import Style as PromptStyle
@@ -923,7 +930,20 @@ async def search_code(query: str, directory_prefix: str | None = None) -> str:
     if not results:
         return "No matches found"
 
-    lines = [f"{r['path']}\n{r['content']}" for r in results]
+    lines: List[str] = []
+    with Progress(
+        SpinnerColumn(),
+        BarColumn(),
+        TaskProgressColumn(),
+        TextColumn("{task.percentage:>3.0f}%"),
+        console=console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("Processing results", total=len(results))
+        for r in results:
+            lines.append(f"{r['path']}\n{r['content']}")
+            progress.update(task, advance=1)
+
     return "\n\n".join(lines)
 
 
@@ -1165,10 +1185,7 @@ async def try_handle_code_search_command(user_input: str) -> bool:
 
 
 async def add_directory_to_conversation(directory_path: str):
-    with console.status(
-        "[bold bright_blue]🔍 Scanning directory...[/bold bright_blue]"
-    ) as status:
-        excluded_files = {
+    excluded_files = {
             # Python specific
             ".DS_Store",
             "Thumbs.db",
@@ -1214,8 +1231,8 @@ async def add_directory_to_conversation(directory_path: str):
             ".svn",
             ".hg",
             "CVS",
-        }
-        excluded_extensions = {
+    }
+    excluded_extensions = {
             # Binary and media files
             ".png",
             ".jpg",
@@ -1284,13 +1301,22 @@ async def add_directory_to_conversation(directory_path: str):
             ".woff",
             ".woff2",
             ".eot",
-        }
-        skipped_files: List[str] = []
-        added_files: List[str] = []
-        eligible_files: List[str] = []
-        max_files = 1000  # Reasonable limit for files to process
-        max_file_size = 5_000_000  # 5MB limit
+    }
+    skipped_files: List[str] = []
+    added_files: List[str] = []
+    eligible_files: List[str] = []
+    max_files = 1000  # Reasonable limit for files to process
+    max_file_size = 5_000_000  # 5MB limit
 
+    with Progress(
+        SpinnerColumn(),
+        BarColumn(),
+        TaskProgressColumn(),
+        TextColumn("{task.percentage:>3.0f}%"),
+        console=console,
+        transient=True,
+    ) as progress:
+        scan_task = progress.add_task("Scanning directory", total=max_files)
         for root, dirs, files in os.walk(directory_path):
             if len(eligible_files) >= max_files:
                 console.print(
@@ -1298,8 +1324,7 @@ async def add_directory_to_conversation(directory_path: str):
                 )
                 break
 
-            status.update(f"[bold bright_blue]🔍 Scanning {root}...[/bold bright_blue]")
-            # Skip hidden directories and excluded directories
+            progress.update(scan_task, description=f"Scanning {root}")
             dirs[:] = [
                 d for d in dirs if not d.startswith(".") and d not in excluded_files
             ]
@@ -1307,6 +1332,8 @@ async def add_directory_to_conversation(directory_path: str):
             for file in files:
                 if len(eligible_files) >= max_files:
                     break
+
+                progress.update(scan_task, advance=1)
 
                 if file.startswith(".") or file in excluded_files:
                     skipped_files.append(os.path.join(root, file))
@@ -1320,12 +1347,10 @@ async def add_directory_to_conversation(directory_path: str):
                 full_path = os.path.join(root, file)
 
                 try:
-                    # Check file size before processing
                     if os.path.getsize(full_path) > max_file_size:
                         skipped_files.append(f"{full_path} (exceeds size limit)")
                         continue
 
-                    # Check if it's binary
                     if is_binary_file(full_path):
                         skipped_files.append(full_path)
                         continue
@@ -1336,13 +1361,14 @@ async def add_directory_to_conversation(directory_path: str):
                 except OSError:
                     skipped_files.append(full_path)
 
-        status.update("[bold bright_blue]📄 Reading files...[/bold bright_blue]")
+        progress.update(scan_task, completed=scan_task.total)
 
-        async def _read_files(paths: List[str]):
-            tasks = [asyncio.to_thread(read_local_file, p) for p in paths]
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-            for path, result in zip(paths, results):
-                if isinstance(result, Exception):
+        if eligible_files:
+            read_task = progress.add_task("Reading files", total=len(eligible_files))
+            for path in eligible_files:
+                try:
+                    result = await asyncio.to_thread(read_local_file, path)
+                except Exception:
                     skipped_files.append(path)
                 else:
                     add_to_history(
@@ -1353,29 +1379,28 @@ async def add_directory_to_conversation(directory_path: str):
                     )
                     added_files.append(path)
 
-        if eligible_files:
-            await _read_files(eligible_files)
+                progress.update(read_task, advance=1)
 
-        total_files_processed = len(added_files)
+    total_files_processed = len(added_files)
 
+    console.print(
+        f"[{THEME.success}]✓[/{THEME.success}] Added folder '[bright_cyan]{directory_path}[/bright_cyan]' to conversation."
+    )
+    if added_files:
         console.print(
-            f"[{THEME.success}]✓[/{THEME.success}] Added folder '[bright_cyan]{directory_path}[/bright_cyan]' to conversation."
+            f"\n[{THEME.success}]📁 Added files:[/{THEME.success}] [dim]({len(added_files)} of {total_files_processed})[/dim]"
         )
-        if added_files:
-            console.print(
-                f"\n[{THEME.success}]📁 Added files:[/{THEME.success}] [dim]({len(added_files)} of {total_files_processed})[/dim]"
-            )
-            for f in added_files:
-                console.print(f"  [bright_cyan]📄 {f}[/bright_cyan]")
-        if skipped_files:
-            console.print(
-                f"\n[{THEME.warning}]⏭ Skipped files:[/{THEME.warning}] [dim]({len(skipped_files)})[/dim]"
-            )
-            for f in skipped_files[:10]:  # Show only first 10 to avoid clutter
-                console.print(f"  [yellow dim]⚠ {f}[/yellow dim]")
-            if len(skipped_files) > 10:
-                console.print(f"  [dim]... and {len(skipped_files) - 10} more[/dim]")
-        console.print()
+        for f in added_files:
+            console.print(f"  [bright_cyan]📄 {f}[/bright_cyan]")
+    if skipped_files:
+        console.print(
+            f"\n[{THEME.warning}]⏭ Skipped files:[/{THEME.warning}] [dim]({len(skipped_files)})[/dim]"
+        )
+        for f in skipped_files[:10]:  # Show only first 10 to avoid clutter
+            console.print(f"  [yellow dim]⚠ {f}[/yellow dim]")
+        if len(skipped_files) > 10:
+            console.print(f"  [dim]... and {len(skipped_files) - 10} more[/dim]")
+    console.print()
 
 
 def is_binary_file(file_path: str, peek_size: int = 1024) -> bool:

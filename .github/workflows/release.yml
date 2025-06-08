@@ -39,10 +39,10 @@ jobs:
 
       # 3. Build Flatpak
       - name: Build Flatpak
-        uses: flatpak/flatpak-github-actions@master
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          manifest_file: 'com.example.MyApp.json'
-          branch: 'stable'
+          manifest-path: com.example.MyApp.json
+          branch: stable
       - uses: actions/upload-artifact@v4
         with:
           name: flatpak

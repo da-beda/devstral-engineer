@@ -2,7 +2,7 @@ version: 1
 AppDir:
   path: ./AppDir
   app_info:
-    id: com.github.da-beda.devstral-engineer
+    id: io.github.dabeda.devstral-engineer
     name: Devstral Engineer
     icon: devstral
     version: 0.1.0

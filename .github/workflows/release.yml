@@ -93,15 +93,15 @@ jobs:
           # Update the wheel filename in the manifest
           WHEEL_FILE=$(ls dist/*.whl | head -1 | xargs basename)
           echo "Found wheel file: $WHEEL_FILE"
-          sed -i "s|dist/devstral_engineer-0.1.0-py3-none-any.whl|dist/$WHEEL_FILE|g" com.github.da-beda.devstral-engineer.json
-          cat com.github.da-beda.devstral-engineer.json
+          sed -i "s|dist/devstral_engineer-0.1.0-py3-none-any.whl|dist/$WHEEL_FILE|g" io.github.dabeda.devstral-engineer.json
+          cat io.github.dabeda.devstral-engineer.json
 
       - name: Build Flatpak
         id: flatpak_build
         continue-on-error: true
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          manifest-path: com.github.da-beda.devstral-engineer.json
+          manifest-path: io.github.dabeda.devstral-engineer.json
           cache-key: flatpak-builder-${{ github.sha }}
 
       - name: Upload Flatpak artifact

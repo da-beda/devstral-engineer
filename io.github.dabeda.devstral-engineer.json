@@ -1,5 +1,5 @@
 {
-  "app-id": "com.github.da-beda.devstral-engineer",
+  "app-id": "io.github.dabeda.devstral-engineer",
   "runtime": "org.freedesktop.Platform",
   "runtime-version": "23.08",
   "sdk": "org.freedesktop.Sdk",

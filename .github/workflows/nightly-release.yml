@@ -10,23 +10,42 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
       - name: Install build tools
         run: |
-          python -m pip install --upgrade pip
-          pip install build
-      - name: Build package
+          python -m pip install --upgrade pip setuptools build
+
+      - name: Build Python packages
         run: python -m build --sdist --wheel
-      - name: Create GitHub Release
+
+      - name: Create nightly release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: nightly-${{ github.run_number }}
-          name: Nightly ${{ github.run_number }}
+          name: Nightly Build ${{ github.run_number }}
           draft: false
           prerelease: true
           files: dist/*
+          body: |
+            ## Nightly Build ${{ github.run_number }}
+
+            This is an automated nightly build from the latest main branch.
+
+            **⚠️ Warning**: This is a development build and may be unstable.
+
+            ### Installation
+            ```bash
+            pip install devstral-engineer
+            ```
+
+            ### Commit
+            Built from commit: ${{ github.sha }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

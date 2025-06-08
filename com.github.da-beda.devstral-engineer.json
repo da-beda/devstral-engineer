@@ -1,0 +1,26 @@
+{
+  "app-id": "com.github.da-beda.devstral-engineer",
+  "runtime": "org.freedesktop.Platform",
+  "runtime-version": "23.08",
+  "sdk": "org.freedesktop.Sdk",
+  "command": "devstral",
+  "finish-args": [
+    "--share=network",
+    "--filesystem=home"
+  ],
+  "modules": [
+    {
+      "name": "python3-pip",
+      "buildsystem": "simple",
+      "build-commands": [
+        "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} *.whl"
+      ],
+      "sources": [
+        {
+          "type": "file",
+          "path": "dist/devstral_engineer-0.1.0-py3-none-any.whl"
+        }
+      ]
+    }
+  ]
+}

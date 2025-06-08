@@ -1,8 +1,0 @@
-{
-  "app-id": "com.example.MyApp",
-  "runtime": "org.freedesktop.Platform",
-  "runtime-version": "23.08",
-  "sdk": "org.freedesktop.Sdk",
-  "command": "python3",
-  "modules": []
-}

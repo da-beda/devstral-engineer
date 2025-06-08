@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Devstral Engineer
+Comment=A powerful coding assistant application
+Exec=devstral
+Icon=devstral
+Categories=Development;
+Terminal=true

@@ -9,104 +9,194 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.get_version.outputs.version }}
+      has_tag: ${{ steps.get_version.outputs.has_tag }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
 
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.x'
+          python-version: '3.11'
 
-      - name: Install Flatpak deps
+      - name: Get version info
+        id: get_version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "has_tag=true" >> $GITHUB_OUTPUT
+          else
+            VERSION="0.1.0"
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "has_tag=false" >> $GITHUB_OUTPUT
+          fi
+          echo "Building version: $VERSION"
+
+      - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y flatpak flatpak-builder xvfb
 
       - name: Install Python build tools
-        run: python -m pip install --upgrade pip setuptools build
-      - name: Install fpm
+        run: |
+          python -m pip install --upgrade pip setuptools build
+
+      - name: Install fpm for .deb packaging
         run: sudo gem install --no-document fpm
-      - name: Build sdist & wheel
+
+      - name: Build Python packages
         run: python -m build --sdist --wheel
-      - name: Build .deb
-        if: startsWith(github.ref, 'refs/tags/')
+
+      - name: Upload Python packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-packages
+          path: dist/*
+          if-no-files-found: error
+      - name: Build .deb package
+        if: steps.get_version.outputs.has_tag == 'true'
         run: |
           cd dist
-          version="${GITHUB_REF#refs/tags/}"
-          version="${version#v}"
-          mkdir pkgroot
+          version="${{ steps.get_version.outputs.version }}"
+          mkdir -p pkgroot
           python -m pip install --prefix=/usr --root=pkgroot *.whl
           fpm -s dir -t deb \
-            --name myapp \
+            --name devstral-engineer \
             --version "$version" \
+            --description "A powerful coding assistant application" \
+            --url "https://github.com/da-beda/devstral-engineer" \
+            --maintainer "da-beda <77482826+da-beda@users.noreply.github.com>" \
+            --license "MIT" \
+            --depends python3 \
+            --depends python3-pip \
             -C pkgroot .
-      - uses: actions/upload-artifact@v4
-        with:
-          name: deb
-          path: dist/*.deb
 
-      - name: Add Flathub remote
-        run: sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+      - name: Upload .deb artifact
+        if: steps.get_version.outputs.has_tag == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-package
+          path: dist/*.deb
+          if-no-files-found: warn
+
+      - name: Setup Flatpak
+        run: |
+          sudo flatpak remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          sudo flatpak install -y flathub org.freedesktop.Platform//23.08 org.freedesktop.Sdk//23.08
+
+      - name: Prepare Flatpak build
+        run: |
+          # Update the wheel filename in the manifest
+          WHEEL_FILE=$(ls dist/*.whl | head -1 | xargs basename)
+          echo "Found wheel file: $WHEEL_FILE"
+          sed -i "s|dist/devstral_engineer-0.1.0-py3-none-any.whl|dist/$WHEEL_FILE|g" com.github.da-beda.devstral-engineer.json
+          cat com.github.da-beda.devstral-engineer.json
+
       - name: Build Flatpak
+        id: flatpak_build
+        continue-on-error: true
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
-          manifest-path: com.example.MyApp.json
-          branch: stable
-          repository-url: https://dl.flathub.org/repo/flathub.flatpakrepo
-      - uses: actions/upload-artifact@v4
+          manifest-path: com.github.da-beda.devstral-engineer.json
+          cache-key: flatpak-builder-${{ github.sha }}
+
+      - name: Upload Flatpak artifact
+        if: steps.flatpak_build.outcome == 'success'
+        uses: actions/upload-artifact@v4
         with:
-          name: flatpak
+          name: flatpak-package
           path: '*.flatpak'
+          if-no-files-found: warn
+
+      - name: Prepare AppImage build
+        run: |
+          # Install the package to create the proper directory structure
+          mkdir -p AppDir/usr
+          python -m pip install --prefix=AppDir/usr dist/*.whl
 
       - name: Build AppImage
+        id: appimage_build
+        continue-on-error: true
         uses: AppImageCrafters/build-appimage@v1
         with:
           recipe: appimage.yml
-      - uses: actions/upload-artifact@v4
+
+      - name: Upload AppImage artifact
+        if: steps.appimage_build.outcome == 'success'
+        uses: actions/upload-artifact@v4
         with:
-          name: appimage
+          name: appimage-package
           path: '*.AppImage'
+          if-no-files-found: warn
 
   release:
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: needs.build.outputs.has_tag == 'true'
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           fetch-tags: true
 
-      - name: Download Debian
+      - name: Download Python packages
         uses: actions/download-artifact@v4
         with:
-          name: deb
-      - name: Download Flatpak
+          name: python-packages
+          path: dist/
+
+      - name: Download .deb package
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
-          name: flatpak
-      - name: Download AppImage
+          name: deb-package
+          path: packages/
+
+      - name: Download Flatpak package
+        continue-on-error: true
         uses: actions/download-artifact@v4
         with:
-          name: appimage
+          name: flatpak-package
+          path: packages/
+
+      - name: Download AppImage package
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: appimage-package
+          path: packages/
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          # Copy Python packages
+          cp dist/* release-assets/ 2>/dev/null || true
+          # Copy other packages if they exist
+          cp packages/* release-assets/ 2>/dev/null || true
+          ls -la release-assets/
 
       - name: Create GitHub Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: Release ${{ needs.build.outputs.version }}
+          draft: false
+          prerelease: false
+          files: release-assets/*
+          body: |
+            ## Release ${{ needs.build.outputs.version }}
 
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          files: |
-            *.deb
-            *.flatpak
-            *.AppImage
+            ### Downloads
+            - **Python Package**: Install with `pip install devstral-engineer`
+            - **Debian Package**: For Ubuntu/Debian systems
+            - **Flatpak**: Universal Linux package
+            - **AppImage**: Portable Linux application
+
+            ### Changes
+            See the commit history for detailed changes in this release.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

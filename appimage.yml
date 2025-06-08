@@ -2,6 +2,42 @@ version: 1
 AppDir:
   path: ./AppDir
   app_info:
-    id: com.example.myapp
-    name: MyApp
-    exec: /usr/bin/env true
+    id: com.github.da-beda.devstral-engineer
+    name: Devstral Engineer
+    icon: devstral
+    version: 0.1.0
+    exec: usr/bin/devstral
+    exec_args: $@
+  apt:
+    arch: amd64
+    sources:
+      - sourceline: 'deb http://archive.ubuntu.com/ubuntu/ jammy main restricted universe multiverse'
+        key_url: 'http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x871920D1991BC93C'
+    include:
+      - python3
+      - python3-pip
+      - python3-setuptools
+  files:
+    include:
+      - usr/bin/devstral
+      - usr/lib/python3*/site-packages/devstral_cli
+      - usr/lib/python3*/site-packages/code_index_engine
+  runtime:
+    env:
+      PYTHONPATH: '${APPDIR}/usr/lib/python3.10/site-packages:${PYTHONPATH}'
+  test:
+    fedora:
+      image: appimagecrafters/tests-env:fedora-30
+      command: ./AppRun --help
+    debian:
+      image: appimagecrafters/tests-env:debian-stable
+      command: ./AppRun --help
+    arch:
+      image: appimagecrafters/tests-env:archlinux-latest
+      command: ./AppRun --help
+    centos:
+      image: appimagecrafters/tests-env:centos-7
+      command: ./AppRun --help
+    ubuntu:
+      image: appimagecrafters/tests-env:ubuntu-xenial
+      command: ./AppRun --help

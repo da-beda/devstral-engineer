@@ -43,7 +43,7 @@ jobs:
         with:
           manifest_file: 'com.example.MyApp.json'
           branch: 'stable'
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: flatpak
           path: '*.flatpak'
@@ -53,7 +53,7 @@ jobs:
         uses: AppImageCrafters/build-appimage@v1
         with:
           recipe: appimage.yml
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: appimage
           path: '*.AppImage'

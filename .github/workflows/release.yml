@@ -17,6 +17,12 @@ jobs:
         with:
           python-version: '3.x'
 
+      # Install tools required for building Flatpak bundles
+      - name: Install Flatpak dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder xvfb
+
       # 2. Build .deb
       - name: Install build tools
         run: |

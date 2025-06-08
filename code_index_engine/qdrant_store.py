@@ -13,6 +13,24 @@ try:
 except Exception:  # pragma: no cover - optional dependency
     QdrantClient = None  # type: ignore
 
+    class Distance:  # type: ignore
+        COSINE = "cosine"
+
+    class VectorParams:  # type: ignore
+        def __init__(self, size: int, distance: Distance) -> None:
+            self.size = size
+            self.distance = distance
+
+    class PointStruct:  # type: ignore
+        def __init__(self, id: str, vector: List[float], payload: Dict[str, str]) -> None:
+            self.id = id
+            self.vector = vector
+            self.payload = payload
+
+    class PointIdsList:  # type: ignore
+        def __init__(self, points: List[str]) -> None:
+            self.points = points
+
 
 class QdrantStore:
     """Simple wrapper around Qdrant for storing code embeddings."""

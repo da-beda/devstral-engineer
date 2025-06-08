@@ -27,11 +27,12 @@ jobs:
         run: python -m build --sdist --wheel
       - name: Build .deb
         run: |
+          cd dist
           fpm -s python -t deb \
               --python-bin python3 \
               --name myapp \
               --version "${{ github.ref_name }}" \
-              dist/*.whl
+              *.whl
       - uses: actions/upload-artifact@v4
         with:
           name: deb

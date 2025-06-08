@@ -42,7 +42,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: deb
-          path: '*.deb'
+          path: 'dist/*.deb'
 
       # 3. Build Flatpak
       - name: Build Flatpak

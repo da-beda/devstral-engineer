@@ -1,0 +1,72 @@
+name: Release Build
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      # 1. Python setup
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      # 2. Build .deb
+      - name: Install build tools
+        run: |
+          python -m pip install --upgrade pip setuptools build
+      - name: Install fpm
+        run: sudo gem install --no-document fpm
+      - name: Build package
+        run: python -m build --sdist --wheel
+      - name: Build .deb
+        run: |
+          fpm -s python -t deb \
+              --python-bin python3 \
+              --name myapp \
+              --version "${{ github.ref_name }}" \
+              dist/*.whl
+      - uses: actions/upload-artifact@v3
+        with:
+          name: deb
+          path: '*.deb'
+
+      # 3. Build Flatpak
+      - name: Build Flatpak
+        uses: flatpak/flatpak-github-actions@master
+        with:
+          manifest_file: 'com.example.MyApp.json'
+          branch: 'stable'
+      - uses: actions/upload-artifact@v3
+        with:
+          name: flatpak
+          path: '*.flatpak'
+
+      # 4. Build AppImage
+      - name: Build AppImage
+        uses: AppImageCrafters/build-appimage@v1
+        with:
+          recipe: appimage.yml
+      - uses: actions/upload-artifact@v3
+        with:
+          name: appimage
+          path: '*.AppImage'
+
+      # 5. Create Release and attach assets
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v1
+        with:
+          files: '*.deb,*.flatpak,*.AppImage'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

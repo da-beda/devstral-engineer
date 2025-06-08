@@ -41,3 +41,21 @@ line-length = 88
 
 [tool.setuptools.package-data]
 "devstral_cli" = ["bin/qdrant-*"]
+
+[tool.setuptools]
+py-modules = [
+    "config",
+    "conversation_store",
+    "cost_tracker",
+    "ddg_deep",
+    "ddg_search",
+    "devstral_eng",
+    "planner",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "code_index_engine",
+    "devstral_cli",
+]

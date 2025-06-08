@@ -1,12 +1,12 @@
-# Devstral Engineer v2 🐋
+# Devstral Engineer 🌪️
 
 ## Overview
 
-Devstral Engineer v2 is a powerful AI-powered coding assistant that provides an interactive terminal interface for seamless code development. It integrates with Devstral's advanced reasoning models to offer intelligent file operations, code analysis, and development assistance through natural conversation and function calling.
+Devstral Engineer is an AI-powered coding assistant that provides an interactive terminal interface for seamless code development. It integrates with Devstral to offer intelligent file operations, code analysis, and development assistance through natural conversation and function calling.
 
 ## 🚀 Latest Update: Function Calling Architecture
 
-**Version 2.0** introduces a big upgrade from structured JSON output to native function calling, providing:
+**Version 0.0.1** introduces a big upgrade from structured JSON output to native function calling, providing:
 - **Natural conversations** with the AI without rigid response formats
 - **Automatic file operations** through intelligent function calls
 - **Real-time reasoning visibility** with Chain of Thought (CoT) capabilities

@@ -32,7 +32,7 @@ jobs:
               --name myapp \
               --version "${{ github.ref_name }}" \
               dist/*.whl
-      - uses: actions/upload-artifact@v3
+      - uses: actions/upload-artifact@v4
         with:
           name: deb
           path: '*.deb'

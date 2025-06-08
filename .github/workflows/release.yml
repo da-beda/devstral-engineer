@@ -52,12 +52,13 @@ jobs:
 
       # 3. Build Flatpak
       - name: Add Flathub remote
-        run: flatpak --user remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+        run: flatpak --user remote-add --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
       - name: Build Flatpak
         uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
           manifest-path: com.example.MyApp.json
           branch: stable
+          repository-url: https://dl.flathub.org/repo/flathub.flatpakrepo
       - uses: actions/upload-artifact@v4
         with:
           name: flatpak

@@ -28,11 +28,17 @@ jobs:
       - name: Build .deb
         run: |
           cd dist
-          fpm -s python -t deb \
-              --python-bin python3 \
+          version="${{ github.ref_name }}"
+          # Strip a leading 'v' from tag names for the package version
+          if [[ "$version" == v* ]]; then
+            version="${version#v}"
+          fi
+          mkdir pkgroot
+          python -m pip install --prefix=/usr --root=pkgroot *.whl
+          fpm -s dir -t deb \
               --name myapp \
-              --version "${{ github.ref_name }}" \
-              *.whl
+              --version "$version" \
+              -C pkgroot .
       - uses: actions/upload-artifact@v4
         with:
           name: deb
